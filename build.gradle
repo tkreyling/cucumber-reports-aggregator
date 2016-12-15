@@ -15,6 +15,8 @@ repositories {
 }
 
 dependencies {
+    compile "org.jdom:jdom2:2.0.6"
+    compile "jaxen:jaxen:1.1.6"
     compile "org.apache.commons:commons-lang3:3.5"
     compileOnly "org.projectlombok:lombok:1.16.12"
     runtime "org.slf4j:slf4j-simple:1.7.21"

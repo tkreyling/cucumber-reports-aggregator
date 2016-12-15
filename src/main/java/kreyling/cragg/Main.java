@@ -1,5 +1,6 @@
 package kreyling.cragg;
 
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
 import lombok.Value;
@@ -13,8 +14,14 @@ import ratpack.http.client.ReceivedResponse;
 import ratpack.server.BaseDir;
 import ratpack.server.RatpackServer;
 
-import org.apache.commons.lang3.StringUtils;
+import org.jdom2.Document;
+import org.jdom2.Element;
+import org.jdom2.filter.Filters;
+import org.jdom2.input.SAXBuilder;
+import org.jdom2.xpath.XPathExpression;
+import org.jdom2.xpath.XPathFactory;
 
+import java.io.StringReader;
 import java.net.URI;
 import java.util.List;
 import java.util.stream.Stream;
@@ -58,6 +65,7 @@ public class Main {
                 .map(promise -> promise
                     .map(ReceivedResponse::getBody)
                     .map(TypedData::getText)
+                    .map(this::repairHtml)
                     .map(this::parseTestReport)
                 )
                 .collect(toList()))
@@ -65,14 +73,47 @@ public class Main {
                 .then(this::renderTestReports);
         }
 
+        private String repairHtml(String text) {
+            return Stream.of(text.split("\n"))
+                .map(this::replaceBrokenLine)
+                .collect(joining("\n"));
+
+        }
+
+        private String replaceBrokenLine(String line) {
+            if (line.contains("container-fluid>")) {
+                return "<div id=\"report-lead\" class=\"container-fluid\">";
+            } else if (line.contains("role=\"button\" data-slide=\"prev\"></span>")) {
+                return "<a class=\"left carousel-control\" href=\"#featureChartCarousel\" role=\"button\" data-slide=\"prev\">";
+            } else if (line.contains("<br>")) {
+                return "<br/>";
+            } else {
+                return line;
+            }
+        }
+
         private TestReport parseTestReport(String text) {
+            Document document = readDocument(text);
+            XPathFactory xPathFactory = XPathFactory.instance();
+
+            XPathExpression<Element> xPathExpression = xPathFactory.compile(
+                "//td[@class=\"tagname\"]/a", Filters.element());
+
+            List<Element> elements = xPathExpression.evaluate(document);
+
             return new TestReport(
-                Stream.of(text.split("\n"))
-                    .filter(line -> line.contains("<td class=\"tagname\">"))
-                    .map(line -> StringUtils.substringBetween(line, ">", "</"))
-                    .map(feature -> new TestReportLine(feature, null))
+                elements.stream()
+                    .map(element -> new TestReportLine(element.getText(), null))
                     .collect(toList())
             );
+        }
+
+        private Document readDocument(String text) {
+            try {
+                return new SAXBuilder().build(new StringReader(text));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         }
 
         private void renderTestReports(List<? extends TestReport> testReports) {
