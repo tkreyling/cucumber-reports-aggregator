@@ -34,6 +34,7 @@ import java.util.stream.Stream;
 public class Main {
 
     public static final String JENKINS_JOB = "https://jenkins.easycredit.intern/view/KW-B2B/view/kwb2b/job/kwb2b-tests/";
+    public static final String RSS_FEED = "/rssAll";
     public static final String CUCUMBER_REPORT = "/cucumber-html-reports/feature-overview.html";
 
     public static void main(String... args) throws Exception {
@@ -125,18 +126,43 @@ public class Main {
         public void process() {
             HttpClient httpClient = context.get(HttpClient.class);
 
-            ParallelBatch.of(Stream.of(1322, 1321, 1319, 1318, 1317, 1316, 1315)
-                .map(build -> URI.create(JENKINS_JOB + build + CUCUMBER_REPORT))
-                .map(httpClient::get)
-                .map(promise -> promise
-                    .map(ReceivedResponse::getBody)
-                    .map(TypedData::getText)
-                    .map(this::repairHtml)
-                    .map(this::parseTestReport)
-                )
-                .collect(toList()))
-                .yield()
-                .then(this::renderTestReports);
+            httpClient.get(URI.create(JENKINS_JOB + RSS_FEED))
+                .map(ReceivedResponse::getBody)
+                .map(TypedData::getText)
+                .map(this::removeNamespace)
+                .map(this::parseJenkinsRssFeed)
+                .then(builds -> ParallelBatch.of(builds.stream()
+                    .map(build -> URI.create(JENKINS_JOB + build + CUCUMBER_REPORT))
+                    .map(httpClient::get)
+                    .map(promise -> promise
+                        .map(ReceivedResponse::getBody)
+                        .map(TypedData::getText)
+                        .map(this::repairHtml)
+                        .map(this::parseTestReport)
+                    )
+                    .collect(toList()))
+                    .yield()
+                    .then(this::renderTestReports)
+                );
+
+        }
+
+        private String removeNamespace(String text) {
+            return StringUtils.replace(text, "<feed xmlns=\"http://www.w3.org/2005/Atom\">", "<feed>");
+        }
+
+        private List<String> parseJenkinsRssFeed(String text) {
+            Document document = readDocument(text);
+            XPathFactory xPathFactory = XPathFactory.instance();
+
+            XPathExpression<Element> rssTitleXPath = xPathFactory.compile(
+                "//entry/title", Filters.element());
+
+            return rssTitleXPath.evaluate(document).stream()
+                .map(Element::getText)
+                .filter(title -> !title.contains("(aborted)"))
+                .map(title -> StringUtils.substringBetween(title, "#", " "))
+                .collect(toList());
         }
 
         private String repairHtml(String text) {
