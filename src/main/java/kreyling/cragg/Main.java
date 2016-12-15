@@ -97,14 +97,21 @@ public class Main {
             XPathFactory xPathFactory = XPathFactory.instance();
 
             XPathExpression<Element> xPathExpression = xPathFactory.compile(
-                "//td[@class=\"tagname\"]/a", Filters.element());
+                "//td[@class=\"tagname\"]/..", Filters.element());
 
             List<Element> elements = xPathExpression.evaluate(document);
 
             return new TestReport(
                 elements.stream()
-                    .map(element -> new TestReportLine(element.getText(), null))
+                    .map(this::mapHtmlRowToTestReportLine)
                     .collect(toList())
+            );
+        }
+
+        private TestReportLine mapHtmlRowToTestReportLine(Element element) {
+            return new TestReportLine(
+                element.getChildren().get(0).getChildren().get(0).getText(),
+                element.getChildren().get(11).getText()
             );
         }
 
@@ -117,9 +124,8 @@ public class Main {
         }
 
         private void renderTestReports(List<? extends TestReport> testReports) {
-            String testReport = testReports.get(0).getTestReportLines().get(0).feature;
             context.getResponse().status(Status.OK).contentType(MediaType.TEXT_HTML);
-            context.render(testReport);
+            context.render(testReports.get(0).getTestReportLines().get(0).toString());
         }
 
     }
