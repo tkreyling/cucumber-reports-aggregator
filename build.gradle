@@ -1,22 +1,23 @@
 buildscript {
-  repositories {
-    jcenter()
-  }
-  dependencies {
-    classpath "io.ratpack:ratpack-gradle:1.4.4"
-  }
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath "io.ratpack:ratpack-gradle:1.4.4"
+    }
 }
 
 apply plugin: "io.ratpack.ratpack-java"
 apply plugin: "idea"
 
 repositories {
-  jcenter()
+    jcenter()
 }
 
 dependencies {
-  compileOnly "org.projectlombok:lombok:1.16.12"
-  runtime "org.slf4j:slf4j-simple:1.7.21"
+    compile "org.apache.commons:commons-lang3:3.5"
+    compileOnly "org.projectlombok:lombok:1.16.12"
+    runtime "org.slf4j:slf4j-simple:1.7.21"
 }
 
 mainClassName = "kreyling.cragg.Main"

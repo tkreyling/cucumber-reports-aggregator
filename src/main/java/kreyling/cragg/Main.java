@@ -1,19 +1,22 @@
 package kreyling.cragg;
 
+import static java.util.stream.Collectors.toList;
+
 import lombok.Value;
-import ratpack.exec.Promise;
 import ratpack.exec.util.ParallelBatch;
 import ratpack.handling.Context;
 import ratpack.http.MediaType;
 import ratpack.http.Status;
+import ratpack.http.TypedData;
 import ratpack.http.client.HttpClient;
 import ratpack.http.client.ReceivedResponse;
 import ratpack.server.BaseDir;
 import ratpack.server.RatpackServer;
 
+import org.apache.commons.lang3.StringUtils;
+
 import java.net.URI;
 import java.util.List;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class Main {
@@ -32,6 +35,17 @@ public class Main {
     }
 
     @Value
+    private static class TestReportLine {
+        String feature;
+        String status;
+    }
+
+    @Value
+    private static class TestReport {
+        List<TestReportLine> testReportLines;
+    }
+
+    @Value
     private static class JenkinsRequestProcessor {
         Context context;
 
@@ -41,16 +55,30 @@ public class Main {
             ParallelBatch.of(Stream.of(1322, 1321, 1319)
                 .map(build -> URI.create(JENKINS_JOB + build + CUCUMBER_REPORT))
                 .map(httpClient::get)
-                .map(promise -> promise.map(receivedResponse ->  receivedResponse.getBody().getText()))
-                .collect(Collectors.toList()))
+                .map(promise -> promise
+                    .map(ReceivedResponse::getBody)
+                    .map(TypedData::getText)
+                    .map(this::parseTestReport)
+                )
+                .collect(toList()))
                 .yield()
-                .then(this::mapJenkinsResponses);
+                .then(this::renderTestReports);
         }
 
-        private void mapJenkinsResponses(List<? extends String> responses) {
-            String response = responses.get(0);
+        private TestReport parseTestReport(String text) {
+            return new TestReport(
+                Stream.of(text.split("\n"))
+                    .filter(line -> line.contains("<td class=\"tagname\">"))
+                    .map(line -> StringUtils.substringBetween(line, ">", "</"))
+                    .map(feature -> new TestReportLine(feature, null))
+                    .collect(toList())
+            );
+        }
+
+        private void renderTestReports(List<? extends TestReport> testReports) {
+            String testReport = testReports.get(0).getTestReportLines().get(0).feature;
             context.getResponse().status(Status.OK).contentType(MediaType.TEXT_HTML);
-            context.render(response);
+            context.render(testReport);
         }
 
     }
