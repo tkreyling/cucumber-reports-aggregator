@@ -11,7 +11,6 @@ import ratpack.exec.util.ParallelBatch;
 import ratpack.handling.Context;
 import ratpack.http.MediaType;
 import ratpack.http.Status;
-import ratpack.http.TypedData;
 import ratpack.http.client.HttpClient;
 import ratpack.http.client.ReceivedResponse;
 import ratpack.server.BaseDir;
@@ -127,16 +126,14 @@ public class Main {
             HttpClient httpClient = context.get(HttpClient.class);
 
             httpClient.get(URI.create(JENKINS_JOB + RSS_FEED))
-                .map(ReceivedResponse::getBody)
-                .map(TypedData::getText)
+                .map(this::getTextFromResponseBody)
                 .map(this::removeNamespace)
                 .map(this::parseJenkinsRssFeed)
                 .then(builds -> ParallelBatch.of(builds.stream()
                     .map(build -> URI.create(JENKINS_JOB + build + CUCUMBER_REPORT))
                     .map(httpClient::get)
                     .map(promise -> promise
-                        .map(ReceivedResponse::getBody)
-                        .map(TypedData::getText)
+                        .map(this::getTextFromResponseBody)
                         .map(this::repairHtml)
                         .map(this::parseTestReport)
                     )
@@ -145,6 +142,10 @@ public class Main {
                     .then(this::renderTestReports)
                 );
 
+        }
+
+        private String getTextFromResponseBody(ReceivedResponse receivedResponse) {
+            return receivedResponse.getBody().getText();
         }
 
         private String removeNamespace(String text) {
