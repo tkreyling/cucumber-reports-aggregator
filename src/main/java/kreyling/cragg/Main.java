@@ -17,6 +17,7 @@ import ratpack.http.client.ReceivedResponse;
 import ratpack.server.BaseDir;
 import ratpack.server.RatpackServer;
 
+import org.apache.commons.lang3.StringUtils;
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.filter.Filters;
@@ -57,10 +58,13 @@ public class Main {
         }
     }
 
+    @Value
     private static class TestReport {
-        private final Map<String, List<TestReportLine>> testReportLinesByFeature;
+        public String buildNumber;
+        Map<String, List<TestReportLine>> testReportLinesByFeature;
 
-        public TestReport(List<TestReportLine> testReportLines) {
+        public TestReport(String buildNumber, List<TestReportLine> testReportLines) {
+            this.buildNumber = buildNumber;
             testReportLinesByFeature = testReportLines.stream().collect(groupingBy(TestReportLine::getFeature));
         }
 
@@ -78,7 +82,13 @@ public class Main {
     @Value
     private static class AggregatedTestReportLine {
         String feature;
-        List<TestReportLine> testReportLines;
+        List<TestReportLineWithBuildNumber> testReportLinesWithBuildNumber;
+    }
+
+    @Value
+    private static class TestReportLineWithBuildNumber {
+        TestReportLine testReportLine;
+        String buildNumber;
     }
 
     @Value
@@ -88,7 +98,7 @@ public class Main {
         public void process() {
             HttpClient httpClient = context.get(HttpClient.class);
 
-            ParallelBatch.of(Stream.of(1322, 1321, 1319)
+            ParallelBatch.of(Stream.of(1322, 1321, 1319, 1318, 1317, 1316, 1315)
                 .map(build -> URI.create(JENKINS_JOB + build + CUCUMBER_REPORT))
                 .map(httpClient::get)
                 .map(promise -> promise
@@ -125,13 +135,19 @@ public class Main {
             Document document = readDocument(text);
             XPathFactory xPathFactory = XPathFactory.instance();
 
-            XPathExpression<Element> xPathExpression = xPathFactory.compile(
+            XPathExpression<Element> titleXPath = xPathFactory.compile(
+                "//title", Filters.element());
+
+            Element title = titleXPath.evaluate(document).get(0);
+
+            XPathExpression<Element> rowXPath = xPathFactory.compile(
                 "//td[@class=\"tagname\"]/..", Filters.element());
 
-            List<Element> elements = xPathExpression.evaluate(document);
+            List<Element> rows = rowXPath.evaluate(document);
 
             return new TestReport(
-                elements.stream()
+                StringUtils.substringBetween(title.getText(), "(no ", ")"),
+                rows.stream()
                     .map(this::mapHtmlRowToTestReportLine)
                     .collect(toList())
             );
@@ -163,39 +179,59 @@ public class Main {
                 .collect(toList());
 
             StringBuilder response = new StringBuilder();
-            response.append("<html>");
-            response.append("<head>");
-            response.append("<link rel=\"stylesheet\" href=\"css/bootstrap.min.css\" type=\"text/css\"/>");
-            response.append("<link rel=\"stylesheet\" href=\"css/reporting.css\" type=\"text/css\"/>");
-            response.append("<link rel=\"stylesheet\" href=\"css/font-awesome.min.css\"/>");
-            response.append("</head>");
-            response.append("<body>");
-            response.append("<table class=\"stats-table table-hover\">");
+            appendLine(response, "<!DOCTYPE html>");
+            appendLine(response, "<html>");
+            appendLine(response, "<head>");
+            appendLine(response, "<link rel=\"stylesheet\" href=\"css/bootstrap.min.css\" type=\"text/css\"/>");
+            appendLine(response, "<link rel=\"stylesheet\" href=\"css/reporting.css\" type=\"text/css\"/>");
+            appendLine(response, "<link rel=\"stylesheet\" href=\"css/font-awesome.min.css\"/>");
+            appendLine(response, "</head>");
+            appendLine(response, "<body>");
+            appendLine(response, "<table class=\"stats-table table-hover\">");
+            appendLine(response, "<thead>");
+            appendLine(response, "<tr class=\"header dont-sort\">");
+            appendLine(response, "<th>Feature</th>");
+            testReports.forEach(testReport ->
+                response.append("<th>").append(testReport.buildNumber).append("</th>\n")
+            );
+            appendLine(response, "</tr>");
+            appendLine(response, "</thead>");
+
             aggregatedTestReportLines.forEach(aggregatedTestReportLine -> {
-                response.append("<tr>");
-                response.append("<td class=\"tagname\">").append(aggregatedTestReportLine.feature).append("</td>");
-                aggregatedTestReportLine.getTestReportLines().forEach(testReportLine ->
+                appendLine(response, "<tr>");
+                response.append("<td class=\"tagname\">").append(aggregatedTestReportLine.feature).append("</td>\n");
+                aggregatedTestReportLine.getTestReportLinesWithBuildNumber().forEach(testReportLineWithBuildNumber -> {
+                    String status = testReportLineWithBuildNumber.testReportLine.status;
                     response.append("<td class=\"")
-                        .append(testReportLine.status.toLowerCase())
+                        .append(status.toLowerCase())
                         .append("\">")
-                        .append(testReportLine.status)
+                        .append(status)
                         .append("</td>")
+                        .append("\n");
+                    }
                 );
-                response.append("</tr>");
+                appendLine(response, "</tr>");
             });
-            response.append("</table>");
-            response.append("</body>");
-            response.append("</html>");
+            appendLine(response, "</table>");
+            appendLine(response, "</body>");
+            appendLine(response, "</html>");
 
             context.render(response.toString());
+        }
+
+        private void appendLine(StringBuilder response, String line) {
+            response.append(line).append("\n");
         }
 
         private AggregatedTestReportLine createAggregatedTestReportLine(
             List<? extends TestReport> testReports,
             String feature
         ) {
-            List<TestReportLine> allTestReportLinesForThisFeature = testReports.stream()
-                .map(testReport -> testReport.getTestReportLineByFeature(feature))
+            List<TestReportLineWithBuildNumber> allTestReportLinesForThisFeature = testReports.stream()
+                .map(testReport -> new TestReportLineWithBuildNumber(
+                    testReport.getTestReportLineByFeature(feature),
+                    testReport.buildNumber))
+                .sorted(comparing(TestReportLineWithBuildNumber::getBuildNumber))
                 .collect(toList());
 
             return new AggregatedTestReportLine(feature, allTestReportLinesForThisFeature);
