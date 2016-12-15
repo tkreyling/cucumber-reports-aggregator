@@ -35,6 +35,7 @@ public class Main {
     public static final String JENKINS_JOB = "https://jenkins.easycredit.intern/view/KW-B2B/view/kwb2b/job/kwb2b-tests/";
     public static final String RSS_FEED = "/rssAll";
     public static final String CUCUMBER_REPORT = "/cucumber-html-reports/feature-overview.html";
+    public static final boolean TWO_COLUMNS = false;
 
     public static void main(String... args) throws Exception {
         RatpackServer.start(server -> server
@@ -259,9 +260,14 @@ public class Main {
             appendLine(response, "<thead>");
             appendLine(response, "<tr class=\"header dont-sort\">");
             appendLine(response, "<th>Feature</th>");
-            testReports.stream().sorted(comparing(TestReport::getBuildNumber)).forEach(testReport ->
-                response.append("<th colspan=\"2\">").append(testReport.buildNumber).append("</th>\n")
-            );
+            testReports.stream().sorted(comparing(TestReport::getBuildNumber)).forEach(testReport -> {
+                if (TWO_COLUMNS) {
+                    response.append("<th colspan=\"2\">");
+                } else {
+                    response.append("<th>");
+                }
+                response.append(testReport.buildNumber).append("</th>\n");
+            });
             appendLine(response, "</tr>");
             appendLine(response, "</thead>");
 
@@ -272,20 +278,24 @@ public class Main {
                         String status = testReportLineWithBuildNumber.testReportLine.status;
                         int failedAndSkippedSteps = testReportLineWithBuildNumber.testReportLine.getFailedAndSkippedStepsInt();
                         int totalSteps = testReportLineWithBuildNumber.testReportLine.getTotalStepsInt();
-                        response
-                            .append("<td class=\"")
-                            .append(status.toLowerCase())
-                            .append("\">");
-                        if (status.equals("Failed")) {
+
+                        if (TWO_COLUMNS) {
                             response
-                                .append(failedAndSkippedSteps)
-                                .append(" / ")
-                                .append(totalSteps)
-                                .append(" ");
+                                .append("<td class=\"")
+                                .append(status.toLowerCase())
+                                .append("\">");
+                            if (status.equals("Failed")) {
+                                response
+                                    .append(failedAndSkippedSteps)
+                                    .append(" / ")
+                                    .append(totalSteps)
+                                    .append(" ");
+                            }
+                            response
+                                .append(status.toLowerCase())
+                                .append("</td>");
                         }
-                        response
-                            .append(status.toLowerCase())
-                            .append("</td>");
+
                         response
                             .append("<td class=\"")
                             .append(status.toLowerCase())
