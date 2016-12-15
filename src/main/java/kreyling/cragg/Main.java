@@ -1,5 +1,6 @@
 package kreyling.cragg;
 
+import lombok.Value;
 import ratpack.exec.Promise;
 import ratpack.exec.util.ParallelBatch;
 import ratpack.handling.Context;
@@ -30,12 +31,9 @@ public class Main {
         );
     }
 
+    @Value
     private static class JenkinsRequestProcessor {
-        private final Context context;
-
-        public JenkinsRequestProcessor(Context context) {
-            this.context = context;
-        }
+        Context context;
 
         public void process() {
             HttpClient httpClient = context.get(HttpClient.class);
