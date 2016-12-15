@@ -49,12 +49,13 @@ public class Main {
     @Value @NonFinal
     private static class TestReportLine {
         String feature;
+        String failedSteps;
         String status;
     }
 
     private static class NullTestReportLine extends TestReportLine{
         public NullTestReportLine(String feature) {
-            super(feature, "");
+            super(feature, "", "");
         }
     }
 
@@ -156,6 +157,7 @@ public class Main {
         private TestReportLine mapHtmlRowToTestReportLine(Element element) {
             return new TestReportLine(
                 element.getChildren().get(0).getChildren().get(0).getText(),
+                element.getChildren().get(6).getText(),
                 element.getChildren().get(11).getText()
             );
         }
@@ -192,7 +194,7 @@ public class Main {
             appendLine(response, "<tr class=\"header dont-sort\">");
             appendLine(response, "<th>Feature</th>");
             testReports.forEach(testReport ->
-                response.append("<th>").append(testReport.buildNumber).append("</th>\n")
+                response.append("<th colspan=\"2\">").append(testReport.buildNumber).append("</th>\n")
             );
             appendLine(response, "</tr>");
             appendLine(response, "</thead>");
@@ -201,13 +203,20 @@ public class Main {
                 appendLine(response, "<tr>");
                 response.append("<td class=\"tagname\">").append(aggregatedTestReportLine.feature).append("</td>\n");
                 aggregatedTestReportLine.getTestReportLinesWithBuildNumber().forEach(testReportLineWithBuildNumber -> {
-                    String status = testReportLineWithBuildNumber.testReportLine.status;
-                    response.append("<td class=\"")
-                        .append(status.toLowerCase())
-                        .append("\">")
-                        .append(status)
-                        .append("</td>")
-                        .append("\n");
+                        String status = testReportLineWithBuildNumber.testReportLine.status;
+                        response.append("<td class=\"")
+                            .append(status.toLowerCase())
+                            .append("\">")
+                            .append(status)
+                            .append("</td>")
+                            .append("\n");
+                        String failedSteps = testReportLineWithBuildNumber.testReportLine.failedSteps;
+                        response.append("<td class=\"")
+                            .append(status.toLowerCase())
+                            .append("\">")
+                            .append(failedSteps)
+                            .append("</td>")
+                            .append("\n");
                     }
                 );
                 appendLine(response, "</tr>");
