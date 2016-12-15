@@ -57,7 +57,6 @@ public class Main {
         }
     }
 
-    @Value
     private static class TestReport {
         private final Map<String, List<TestReportLine>> testReportLinesByFeature;
 
