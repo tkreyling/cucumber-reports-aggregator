@@ -50,12 +50,29 @@ public class Main {
     private static class TestReportLine {
         String feature;
         String failedSteps;
+        String totalSteps;
         String status;
+
+        public int getTotalStepsInt() {
+            try {
+                return Integer.parseInt(totalSteps);
+            } catch (NumberFormatException e) {
+                return 0;
+            }
+        }
+
+        public int getFailedStepsInt() {
+            try {
+                return Integer.parseInt(failedSteps);
+            } catch (NumberFormatException e) {
+                return 0;
+            }
+        }
     }
 
     private static class NullTestReportLine extends TestReportLine{
         public NullTestReportLine(String feature) {
-            super(feature, "", "");
+            super(feature, "", "", "");
         }
     }
 
@@ -158,6 +175,7 @@ public class Main {
             return new TestReportLine(
                 element.getChildren().get(0).getChildren().get(0).getText(),
                 element.getChildren().get(6).getText(),
+                element.getChildren().get(4).getText(),
                 element.getChildren().get(11).getText()
             );
         }
@@ -180,6 +198,15 @@ public class Main {
                 .sorted(comparing(AggregatedTestReportLine::getFeature))
                 .collect(toList());
 
+            StringBuilder response = buildHtml(testReports, aggregatedTestReportLines);
+
+            context.render(response.toString());
+        }
+
+        private StringBuilder buildHtml(
+            List<? extends TestReport> testReports,
+            List<AggregatedTestReportLine> aggregatedTestReportLines
+        ) {
             StringBuilder response = new StringBuilder();
             appendLine(response, "<!DOCTYPE html>");
             appendLine(response, "<html>");
@@ -187,6 +214,7 @@ public class Main {
             appendLine(response, "<link rel=\"stylesheet\" href=\"css/bootstrap.min.css\" type=\"text/css\"/>");
             appendLine(response, "<link rel=\"stylesheet\" href=\"css/reporting.css\" type=\"text/css\"/>");
             appendLine(response, "<link rel=\"stylesheet\" href=\"css/font-awesome.min.css\"/>");
+            appendLine(response, "<link rel=\"stylesheet\" href=\"css/progressbar.css\"/>");
             appendLine(response, "</head>");
             appendLine(response, "<body>");
             appendLine(response, "<table class=\"stats-table table-hover\">");
@@ -204,17 +232,36 @@ public class Main {
                 response.append("<td class=\"tagname\">").append(aggregatedTestReportLine.feature).append("</td>\n");
                 aggregatedTestReportLine.getTestReportLinesWithBuildNumber().forEach(testReportLineWithBuildNumber -> {
                         String status = testReportLineWithBuildNumber.testReportLine.status;
-                        response.append("<td class=\"")
-                            .append(status.toLowerCase())
-                            .append("\">")
-                            .append(status)
-                            .append("</td>")
-                            .append("\n");
                         String failedSteps = testReportLineWithBuildNumber.testReportLine.failedSteps;
-                        response.append("<td class=\"")
+                        int failedStepsInt = testReportLineWithBuildNumber.testReportLine.getFailedStepsInt();
+                        int totalSteps = testReportLineWithBuildNumber.testReportLine.getTotalStepsInt();
+                        response
+                            .append("<td class=\"")
                             .append(status.toLowerCase())
-                            .append("\">")
-                            .append(failedSteps)
+                            .append("\">");
+                        if (status.equals("Failed")) {
+                            response
+                                .append(failedSteps)
+                                .append(" / ")
+                                .append(totalSteps)
+                                .append(" ");
+                        }
+                        response
+                            .append(status.toLowerCase())
+                            .append("</td>");
+                        response
+                            .append("<td class=\"")
+                            .append(status.toLowerCase())
+                            .append("\">");
+                        if (status.equals("Failed")) {
+                            response
+                                .append("<div class=\"progress center-block\">")
+                                .append("<div class=\"progress-bar progress-bar-danger\"  role=\"progressbar\"  style=\"width: ")
+                                .append(Math.min(100, Math.round((150.0 * failedStepsInt) / totalSteps)))
+                                .append("%\"></div>")
+                                .append("</div>");
+                        }
+                        response
                             .append("</td>")
                             .append("\n");
                     }
@@ -224,8 +271,7 @@ public class Main {
             appendLine(response, "</table>");
             appendLine(response, "</body>");
             appendLine(response, "</html>");
-
-            context.render(response.toString());
+            return response;
         }
 
         private void appendLine(StringBuilder response, String line) {
