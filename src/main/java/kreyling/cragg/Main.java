@@ -274,51 +274,54 @@ public class Main {
             aggregatedTestReportLines.forEach(aggregatedTestReportLine -> {
                 appendLine(response, "<tr>");
                 response.append("<td class=\"tagname\">").append(aggregatedTestReportLine.feature).append("</td>\n");
-                aggregatedTestReportLine.getTestReportLinesWithBuildNumber().forEach(testReportLineWithBuildNumber -> {
-                        String status = testReportLineWithBuildNumber.testReportLine.status;
-                        int failedAndSkippedSteps = testReportLineWithBuildNumber.testReportLine.getFailedAndSkippedStepsInt();
-                        int totalSteps = testReportLineWithBuildNumber.testReportLine.getTotalStepsInt();
-
-                        if (TWO_COLUMNS) {
-                            response
-                                .append("<td class=\"")
-                                .append(status.toLowerCase())
-                                .append("\">");
-                            if (status.equals("Failed")) {
-                                response
-                                    .append(failedAndSkippedSteps)
-                                    .append(" / ")
-                                    .append(totalSteps)
-                                    .append(" ");
-                            }
-                            response
-                                .append(status.toLowerCase())
-                                .append("</td>");
-                        }
-
-                        response
-                            .append("<td class=\"")
-                            .append(status.toLowerCase())
-                            .append("\">");
-                        if (status.equals("Failed")) {
-                            response
-                                .append("<div class=\"progress center-block\">")
-                                .append("<div class=\"progress-bar progress-bar-danger\"  role=\"progressbar\"  style=\"width: ")
-                                .append(Math.min(100, Math.round((100.0 * failedAndSkippedSteps) / totalSteps)))
-                                .append("%\"></div>")
-                                .append("</div>");
-                        }
-                        response
-                            .append("</td>")
-                            .append("\n");
-                    }
-                );
+                aggregatedTestReportLine
+                    .getTestReportLinesWithBuildNumber()
+                    .forEach(testReportLineWithBuildNumber -> writeOneTestResult(response, testReportLineWithBuildNumber));
                 appendLine(response, "</tr>");
             });
             appendLine(response, "</table>");
             appendLine(response, "</body>");
             appendLine(response, "</html>");
             return response;
+        }
+
+        private void writeOneTestResult(StringBuilder response, TestReportLineWithBuildNumber testReportLineWithBuildNumber) {
+            String status = testReportLineWithBuildNumber.testReportLine.status;
+            int failedAndSkippedSteps = testReportLineWithBuildNumber.testReportLine.getFailedAndSkippedStepsInt();
+            int totalSteps = testReportLineWithBuildNumber.testReportLine.getTotalStepsInt();
+
+            if (TWO_COLUMNS) {
+                response
+                    .append("<td class=\"")
+                    .append(status.toLowerCase())
+                    .append("\">");
+                if (status.equals("Failed")) {
+                    response
+                        .append(failedAndSkippedSteps)
+                        .append(" / ")
+                        .append(totalSteps)
+                        .append(" ");
+                }
+                response
+                    .append(status.toLowerCase())
+                    .append("</td>");
+            }
+
+            response
+                .append("<td class=\"")
+                .append(status.toLowerCase())
+                .append("\">");
+            if (status.equals("Failed")) {
+                response
+                    .append("<div class=\"progress center-block\">")
+                    .append("<div class=\"progress-bar progress-bar-danger\"  role=\"progressbar\"  style=\"width: ")
+                    .append(Math.min(100, Math.round((100.0 * failedAndSkippedSteps) / totalSteps)))
+                    .append("%\"></div>")
+                    .append("</div>");
+            }
+            response
+                .append("</td>")
+                .append("\n");
         }
 
         private void appendLine(StringBuilder response, String line) {
