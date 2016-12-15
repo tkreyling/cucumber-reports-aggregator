@@ -50,29 +50,38 @@ public class Main {
     private static class TestReportLine {
         String feature;
         String failedSteps;
+        String skippedSteps;
         String totalSteps;
         String status;
 
-        public int getTotalStepsInt() {
+        public int toInt(String string) {
             try {
-                return Integer.parseInt(totalSteps);
+                return Integer.parseInt(string);
             } catch (NumberFormatException e) {
                 return 0;
             }
         }
 
+        public int getTotalStepsInt() {
+            return toInt(totalSteps);
+        }
+
         public int getFailedStepsInt() {
-            try {
-                return Integer.parseInt(failedSteps);
-            } catch (NumberFormatException e) {
-                return 0;
-            }
+            return toInt(failedSteps);
+        }
+
+        public int getSkippedStepsInt() {
+            return toInt(skippedSteps);
+        }
+
+        public int getFailedAndSkippedStepsInt() {
+            return getFailedStepsInt() + getSkippedStepsInt();
         }
     }
 
     private static class NullTestReportLine extends TestReportLine{
         public NullTestReportLine(String feature) {
-            super(feature, "", "", "");
+            super(feature, "", "", "", "");
         }
     }
 
@@ -175,6 +184,7 @@ public class Main {
             return new TestReportLine(
                 element.getChildren().get(0).getChildren().get(0).getText(),
                 element.getChildren().get(6).getText(),
+                element.getChildren().get(7).getText(),
                 element.getChildren().get(4).getText(),
                 element.getChildren().get(11).getText()
             );
@@ -211,6 +221,7 @@ public class Main {
             appendLine(response, "<!DOCTYPE html>");
             appendLine(response, "<html>");
             appendLine(response, "<head>");
+            appendLine(response, "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />");
             appendLine(response, "<link rel=\"stylesheet\" href=\"css/bootstrap.min.css\" type=\"text/css\"/>");
             appendLine(response, "<link rel=\"stylesheet\" href=\"css/reporting.css\" type=\"text/css\"/>");
             appendLine(response, "<link rel=\"stylesheet\" href=\"css/font-awesome.min.css\"/>");
@@ -221,7 +232,7 @@ public class Main {
             appendLine(response, "<thead>");
             appendLine(response, "<tr class=\"header dont-sort\">");
             appendLine(response, "<th>Feature</th>");
-            testReports.forEach(testReport ->
+            testReports.stream().sorted(comparing(TestReport::getBuildNumber)).forEach(testReport ->
                 response.append("<th colspan=\"2\">").append(testReport.buildNumber).append("</th>\n")
             );
             appendLine(response, "</tr>");
@@ -232,8 +243,7 @@ public class Main {
                 response.append("<td class=\"tagname\">").append(aggregatedTestReportLine.feature).append("</td>\n");
                 aggregatedTestReportLine.getTestReportLinesWithBuildNumber().forEach(testReportLineWithBuildNumber -> {
                         String status = testReportLineWithBuildNumber.testReportLine.status;
-                        String failedSteps = testReportLineWithBuildNumber.testReportLine.failedSteps;
-                        int failedStepsInt = testReportLineWithBuildNumber.testReportLine.getFailedStepsInt();
+                        int failedAndSkippedSteps = testReportLineWithBuildNumber.testReportLine.getFailedAndSkippedStepsInt();
                         int totalSteps = testReportLineWithBuildNumber.testReportLine.getTotalStepsInt();
                         response
                             .append("<td class=\"")
@@ -241,7 +251,7 @@ public class Main {
                             .append("\">");
                         if (status.equals("Failed")) {
                             response
-                                .append(failedSteps)
+                                .append(failedAndSkippedSteps)
                                 .append(" / ")
                                 .append(totalSteps)
                                 .append(" ");
@@ -257,7 +267,7 @@ public class Main {
                             response
                                 .append("<div class=\"progress center-block\">")
                                 .append("<div class=\"progress-bar progress-bar-danger\"  role=\"progressbar\"  style=\"width: ")
-                                .append(Math.min(100, Math.round((150.0 * failedStepsInt) / totalSteps)))
+                                .append(Math.min(100, Math.round((100.0 * failedAndSkippedSteps) / totalSteps)))
                                 .append("%\"></div>")
                                 .append("</div>");
                         }
