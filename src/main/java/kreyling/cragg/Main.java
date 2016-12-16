@@ -122,6 +122,7 @@ public class Main {
     @Value
     private static class JenkinsRequestProcessor {
         Context context;
+        AggregatedReportBuilder aggregatedReportBuilder = new AggregatedReportBuilder();
 
         public void process() {
             HttpClient httpClient = context.get(HttpClient.class);
@@ -236,96 +237,7 @@ public class Main {
                 .sorted(comparing(AggregatedTestReportLine::getFeature))
                 .collect(toList());
 
-            StringBuilder response = buildHtml(testReports, aggregatedTestReportLines);
-
-            context.render(response.toString());
-        }
-
-        private StringBuilder buildHtml(
-            List<? extends TestReport> testReports,
-            List<AggregatedTestReportLine> aggregatedTestReportLines
-        ) {
-            StringBuilder response = new StringBuilder();
-            appendLine(response, "<!DOCTYPE html>");
-            appendLine(response, "<html>");
-            appendLine(response, "<head>");
-            appendLine(response, "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />");
-            appendLine(response, "<link rel=\"stylesheet\" href=\"css/bootstrap.min.css\" type=\"text/css\"/>");
-            appendLine(response, "<link rel=\"stylesheet\" href=\"css/reporting.css\" type=\"text/css\"/>");
-            appendLine(response, "<link rel=\"stylesheet\" href=\"css/font-awesome.min.css\"/>");
-            appendLine(response, "<link rel=\"stylesheet\" href=\"css/progressbar.css\"/>");
-            appendLine(response, "</head>");
-            appendLine(response, "<body>");
-            appendLine(response, "<table class=\"stats-table table-hover\">");
-            appendLine(response, "<thead>");
-            appendLine(response, "<tr class=\"header dont-sort\">");
-            appendLine(response, "<th>Feature</th>");
-            testReports.stream().sorted(comparing(TestReport::getBuildNumber)).forEach(testReport -> {
-                if (TWO_COLUMNS) {
-                    response.append("<th colspan=\"2\">");
-                } else {
-                    response.append("<th>");
-                }
-                response.append(testReport.buildNumber).append("</th>\n");
-            });
-            appendLine(response, "</tr>");
-            appendLine(response, "</thead>");
-
-            aggregatedTestReportLines.forEach(aggregatedTestReportLine -> {
-                appendLine(response, "<tr>");
-                response.append("<td class=\"tagname\">").append(aggregatedTestReportLine.feature).append("</td>\n");
-                aggregatedTestReportLine
-                    .getTestReportLinesWithBuildNumber()
-                    .forEach(testReportLineWithBuildNumber -> writeOneTestResult(response, testReportLineWithBuildNumber));
-                appendLine(response, "</tr>");
-            });
-            appendLine(response, "</table>");
-            appendLine(response, "</body>");
-            appendLine(response, "</html>");
-            return response;
-        }
-
-        private void writeOneTestResult(StringBuilder response, TestReportLineWithBuildNumber testReportLineWithBuildNumber) {
-            String status = testReportLineWithBuildNumber.testReportLine.status;
-            int failedAndSkippedSteps = testReportLineWithBuildNumber.testReportLine.getFailedAndSkippedStepsInt();
-            int totalSteps = testReportLineWithBuildNumber.testReportLine.getTotalStepsInt();
-
-            if (TWO_COLUMNS) {
-                response
-                    .append("<td class=\"")
-                    .append(status.toLowerCase())
-                    .append("\">");
-                if (status.equals("Failed")) {
-                    response
-                        .append(failedAndSkippedSteps)
-                        .append(" / ")
-                        .append(totalSteps)
-                        .append(" ");
-                }
-                response
-                    .append(status.toLowerCase())
-                    .append("</td>");
-            }
-
-            response
-                .append("<td class=\"")
-                .append(status.toLowerCase())
-                .append("\">");
-            if (status.equals("Failed")) {
-                response
-                    .append("<div class=\"progress center-block\">")
-                    .append("<div class=\"progress-bar progress-bar-danger\"  role=\"progressbar\"  style=\"width: ")
-                    .append(Math.min(100, Math.round((100.0 * failedAndSkippedSteps) / totalSteps)))
-                    .append("%\"></div>")
-                    .append("</div>");
-            }
-            response
-                .append("</td>")
-                .append("\n");
-        }
-
-        private void appendLine(StringBuilder response, String line) {
-            response.append(line).append("\n");
+            context.render(aggregatedReportBuilder.buildHtml(testReports, aggregatedTestReportLines));
         }
 
         private AggregatedTestReportLine createAggregatedTestReportLine(
@@ -341,6 +253,105 @@ public class Main {
 
             return new AggregatedTestReportLine(feature, allTestReportLinesForThisFeature);
         }
+    }
 
+    public static class AggregatedReportBuilder {
+        StringBuilder response = new StringBuilder();
+
+        private String buildHtml(
+            List<? extends TestReport> testReports,
+            List<AggregatedTestReportLine> aggregatedTestReportLines
+        ) {
+            appendLine("<!DOCTYPE html>");
+            appendLine("<html>");
+            appendLine("<head>");
+            appendLine("<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />");
+            appendLine("<link rel=\"stylesheet\" href=\"css/bootstrap.min.css\" type=\"text/css\"/>");
+            appendLine("<link rel=\"stylesheet\" href=\"css/reporting.css\" type=\"text/css\"/>");
+            appendLine("<link rel=\"stylesheet\" href=\"css/font-awesome.min.css\"/>");
+            appendLine("<link rel=\"stylesheet\" href=\"css/progressbar.css\"/>");
+            appendLine("</head>");
+            appendLine("<body>");
+            appendLine("<table class=\"stats-table table-hover\">");
+            appendLine("<thead>");
+            appendLine("<tr class=\"header dont-sort\">");
+            appendLine("<th>Feature</th>");
+            testReports.stream().sorted(comparing(TestReport::getBuildNumber)).forEach(testReport -> {
+                if (TWO_COLUMNS) {
+                    append("<th colspan=\"2\">");
+                } else {
+                    append("<th>");
+                }
+                append(testReport.buildNumber).appendLine("</th>");
+            });
+            appendLine("</tr>");
+            appendLine("</thead>");
+
+            aggregatedTestReportLines.forEach(aggregatedTestReportLine -> {
+                appendLine("<tr>");
+                append("<td class=\"tagname\">").append(aggregatedTestReportLine.feature).appendLine("</td>");
+                aggregatedTestReportLine
+                    .getTestReportLinesWithBuildNumber()
+                    .forEach(this::writeOneTestResult);
+                appendLine("</tr>");
+            });
+            appendLine("</table>");
+            appendLine("</body>");
+            appendLine("</html>");
+
+            return response.toString();
+        }
+
+        private void writeOneTestResult(TestReportLineWithBuildNumber testReportLineWithBuildNumber) {
+            String status = testReportLineWithBuildNumber.testReportLine.status;
+            int failedAndSkippedSteps = testReportLineWithBuildNumber.testReportLine.getFailedAndSkippedStepsInt();
+            int totalSteps = testReportLineWithBuildNumber.testReportLine.getTotalStepsInt();
+
+            if (TWO_COLUMNS) {
+                append("<td class=\"");
+                append(status.toLowerCase());
+                append("\">");
+                if (status.equals("Failed")) {
+                     append(failedAndSkippedSteps);
+                     append(" / ");
+                     append(totalSteps);
+                     append(" ");
+                }
+                append(status.toLowerCase());
+                append("</td>");
+            }
+
+            append("<td class=\"");
+            append(status.toLowerCase());
+            append("\">");
+            if (status.equals("Failed")) {
+                append("<div class=\"progress center-block\">");
+                append("<div class=\"progress-bar progress-bar-danger\"  role=\"progressbar\"  style=\"width: ");
+                append(Math.min(100, Math.round((100.0 * failedAndSkippedSteps) / totalSteps)));
+                append("%\"></div>");
+                append("</div>");
+            }
+            append("</td>");
+            append("\n");
+        }
+
+        private void appendLine(String line) {
+            response.append(line).append("\n");
+        }
+
+        private AggregatedReportBuilder append(String text) {
+            response.append(text);
+            return this;
+        }
+
+        private AggregatedReportBuilder append(int number) {
+            response.append(number);
+            return this;
+        }
+
+        private AggregatedReportBuilder append(double number) {
+            response.append(number);
+            return this;
+        }
     }
 }
