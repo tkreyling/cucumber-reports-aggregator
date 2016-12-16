@@ -32,17 +32,18 @@ import java.util.stream.Stream;
 
 public class Main {
 
-    public static final String JENKINS_JOB = "https://jenkins.easycredit.intern/view/KW-B2B/view/kwb2b/job/kwb2b-tests/";
     public static final String RSS_FEED = "/rssAll";
     public static final String CUCUMBER_REPORT = "/cucumber-html-reports/feature-overview.html";
     public static final boolean TWO_COLUMNS = false;
 
     public static void main(String... args) throws Exception {
+        String jenkinsJob = args[0];
+
         RatpackServer.start(server -> server
             .serverConfig(c -> c.baseDir(BaseDir.find()).build())
             .handlers(chain -> chain
                     .files(files -> files.dir("static"))
-                    .get(context -> new JenkinsRequestProcessor(context).process())
+                    .get(context -> new JenkinsRequestProcessor(jenkinsJob, context).process())
             )
         );
     }
@@ -121,18 +122,19 @@ public class Main {
 
     @Value
     private static class JenkinsRequestProcessor {
+        String jenkinsJob;
         Context context;
         AggregatedReportBuilder aggregatedReportBuilder = new AggregatedReportBuilder();
 
         public void process() {
             HttpClient httpClient = context.get(HttpClient.class);
 
-            httpClient.get(URI.create(JENKINS_JOB + RSS_FEED))
+            httpClient.get(URI.create(jenkinsJob + RSS_FEED))
                 .map(this::getTextFromResponseBody)
                 .map(this::removeNamespace)
                 .map(this::parseJenkinsRssFeed)
                 .then(builds -> ParallelBatch.of(builds.stream()
-                    .map(build -> URI.create(JENKINS_JOB + build + CUCUMBER_REPORT))
+                    .map(build -> URI.create(jenkinsJob + build + CUCUMBER_REPORT))
                     .map(httpClient::get)
                     .map(promise -> promise
                         .map(this::getTextFromResponseBody)
