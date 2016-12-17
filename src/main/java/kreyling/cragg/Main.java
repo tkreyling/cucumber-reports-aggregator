@@ -34,7 +34,10 @@ import java.util.stream.Stream;
 public class Main {
 
     public static final String RSS_FEED = "/rssAll";
-    public static final String CUCUMBER_REPORT = "/cucumber-html-reports/feature-overview.html";
+
+    public static final String CUCUMBER_REPORTS_PATH = "/cucumber-html-reports/";
+    public static final String CUCUMBER_REPORTS_OVERVIEW_PAGE = CUCUMBER_REPORTS_PATH + "feature-overview.html";
+
     public static final boolean TWO_COLUMNS = false;
 
     public static void main(String... args) throws Exception {
@@ -52,6 +55,7 @@ public class Main {
     @Value @NonFinal
     private static class TestReportLine {
         String feature;
+        String featureLink;
         String failedSteps;
         String skippedSteps;
         String totalSteps;
@@ -84,7 +88,7 @@ public class Main {
 
     private static class NullTestReportLine extends TestReportLine{
         public NullTestReportLine(String feature) {
-            super(feature, "", "", "", "");
+            super(feature, "", "", "", "", "");
         }
     }
 
@@ -140,7 +144,7 @@ public class Main {
                 .map(this::removeNamespace)
                 .map(this::parseJenkinsRssFeed)
                 .then(builds -> ParallelBatch.of(builds.stream()
-                    .map(build -> URI.create(jenkinsJob + build + CUCUMBER_REPORT))
+                    .map(build -> URI.create(jenkinsJob + build + CUCUMBER_REPORTS_OVERVIEW_PAGE))
                     .map(httpClient::get)
                     .map(promise -> promise
                         .map(this::getTextFromResponseBody)
@@ -220,6 +224,7 @@ public class Main {
         private TestReportLine mapHtmlRowToTestReportLine(Element element) {
             return new TestReportLine(
                 element.getChildren().get(0).getChildren().get(0).getText(),
+                element.getChildren().get(0).getChildren().get(0).getAttributeValue("href"),
                 element.getChildren().get(6).getText(),
                 element.getChildren().get(7).getText(),
                 element.getChildren().get(4).getText(),
@@ -316,6 +321,8 @@ public class Main {
         }
 
         private void writeOneTestResult(TestReportLineWithBuildNumber testReportLineWithBuildNumber) {
+            String buildNumber = testReportLineWithBuildNumber.buildNumber;
+            String featureLink = testReportLineWithBuildNumber.testReportLine.featureLink;
             String status = testReportLineWithBuildNumber.testReportLine.status;
             int failedAndSkippedSteps = testReportLineWithBuildNumber.testReportLine.getFailedAndSkippedStepsInt();
             int totalSteps = testReportLineWithBuildNumber.testReportLine.getTotalStepsInt();
@@ -338,11 +345,15 @@ public class Main {
             append(status.toLowerCase());
             append("\">");
             if (status.equals("Failed")) {
+                append("<a href=\"");
+                append(jenkinsJob).append(buildNumber).append(CUCUMBER_REPORTS_PATH).append(featureLink);
+                append("\">");
                 append("<div class=\"progress center-block\">");
                 append("<div class=\"progress-bar progress-bar-danger\"  role=\"progressbar\"  style=\"width: ");
                 append(Math.min(100, Math.round((100.0 * failedAndSkippedSteps) / totalSteps)));
                 append("%\"></div>");
                 append("</div>");
+                append("</a>");
             }
             append("</td>");
             append("\n");
