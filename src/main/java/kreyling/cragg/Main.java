@@ -354,6 +354,12 @@ public class Main {
                 append("%\"></div>");
                 append("</div>");
                 append("</a>");
+            } else if (status.equals("Passed")) {
+                append("<a href=\"");
+                append(jenkinsJob).append(buildNumber).append(CUCUMBER_REPORTS_PATH).append(featureLink);
+                append("\">");
+                append("<span class=\"glyphicon glyphicon-ok text-success\" aria-hidden=\"true\"></span>");
+                append("</a>");
             }
             append("</td>");
             append("\n");
