@@ -5,6 +5,7 @@ import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
+import lombok.AllArgsConstructor;
 import lombok.Value;
 import lombok.experimental.NonFinal;
 import ratpack.exec.util.ParallelBatch;
@@ -121,10 +122,15 @@ public class Main {
     }
 
     @Value
+    @AllArgsConstructor
     private static class JenkinsRequestProcessor {
         String jenkinsJob;
         Context context;
-        AggregatedReportBuilder aggregatedReportBuilder = new AggregatedReportBuilder();
+        AggregatedReportBuilder aggregatedReportBuilder;
+
+        public JenkinsRequestProcessor(String jenkinsJob, Context context) {
+            this(jenkinsJob, context, new AggregatedReportBuilder(jenkinsJob));
+        }
 
         public void process() {
             HttpClient httpClient = context.get(HttpClient.class);
@@ -257,7 +263,9 @@ public class Main {
         }
     }
 
+    @Value
     public static class AggregatedReportBuilder {
+        String jenkinsJob;
         StringBuilder response = new StringBuilder();
 
         private String buildHtml(
@@ -284,7 +292,10 @@ public class Main {
                 } else {
                     append("<th>");
                 }
-                append(testReport.buildNumber).appendLine("</th>");
+                append("<a href=\"").append(jenkinsJob).append(testReport.buildNumber).append("/\">");
+                append(testReport.buildNumber);
+                append("</a>");
+                appendLine("</th>");
             });
             appendLine("</tr>");
             appendLine("</thead>");
