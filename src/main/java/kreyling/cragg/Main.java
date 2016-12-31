@@ -35,7 +35,7 @@ import java.util.stream.Stream;
 
 public class Main {
 
-    public static final String RSS_FEED = "/rssAll";
+    public static final String JENKINS_API_SUFFIX = "/api/xml";
 
     public static final String CUCUMBER_REPORTS_PATH = "/cucumber-html-reports/";
     public static final String CUCUMBER_REPORTS_OVERVIEW_PAGE = CUCUMBER_REPORTS_PATH + "feature-overview.html";
@@ -141,10 +141,9 @@ public class Main {
         public void process() {
             HttpClient httpClient = context.get(HttpClient.class);
 
-            httpClient.get(URI.create(jenkinsJob + RSS_FEED))
+            httpClient.get(URI.create(jenkinsJob + JENKINS_API_SUFFIX))
                 .map(this::getTextFromResponseBody)
-                .map(this::removeNamespace)
-                .map(this::parseJenkinsRssFeed)
+                .map(this::parseBuildNumbersFromJob)
                 .then(builds -> ParallelBatch.of(builds.stream()
                     .map(build -> {
                         URI uri = URI.create(jenkinsJob + build + CUCUMBER_REPORTS_OVERVIEW_PAGE);
@@ -165,22 +164,25 @@ public class Main {
             return receivedResponse.getBody().getText();
         }
 
-        private String removeNamespace(String text) {
-            return StringUtils.replace(text, "<feed xmlns=\"http://www.w3.org/2005/Atom\">", "<feed>");
-        }
-
-        private List<String> parseJenkinsRssFeed(String text) {
+        private List<String> parseBuildNumbersFromJob(String text) {
             Document document = readDocument(text);
             XPathFactory xPathFactory = XPathFactory.instance();
 
-            XPathExpression<Element> rssTitleXPath = xPathFactory.compile(
-                "//entry/title", Filters.element());
+            XPathExpression<Element> buildXPath = xPathFactory.compile("//build/number", Filters.element());
 
-            return rssTitleXPath.evaluate(document).stream()
+            String lastSuccessfulBuild = getSingleValue("//lastSuccessfulBuild/number", xPathFactory, document);
+            String firstBuild = getSingleValue("//firstBuild/number", xPathFactory, document);
+
+            return buildXPath.evaluate(document).stream()
                 .map(Element::getText)
-                .filter(title -> !title.contains("(aborted)"))
-                .map(title -> StringUtils.substringBetween(title, "#", " "))
+                .filter(build -> !build.equals(firstBuild))
+                .filter(build -> !build.equals(lastSuccessfulBuild))
                 .collect(toList());
+        }
+
+        private String getSingleValue(String query, XPathFactory xPathFactory, Document document) {
+            XPathExpression<Element> xPathExpression = xPathFactory.compile(query, Filters.element());
+            return xPathExpression.evaluate(document).get(0).getText();
         }
 
         private String repairHtml(String text) {
