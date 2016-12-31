@@ -4,6 +4,7 @@ import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
+import static org.apache.commons.lang3.StringUtils.left;
 
 import lombok.AllArgsConstructor;
 import lombok.Value;
@@ -144,13 +145,13 @@ public class Main {
                 .map(this::removeNamespace)
                 .map(this::parseJenkinsRssFeed)
                 .then(builds -> ParallelBatch.of(builds.stream()
-                    .map(build -> URI.create(jenkinsJob + build + CUCUMBER_REPORTS_OVERVIEW_PAGE))
-                    .map(httpClient::get)
-                    .map(promise -> promise
-                        .map(this::getTextFromResponseBody)
-                        .map(this::repairHtml)
-                        .map(this::parseTestReport)
-                    )
+                    .map(build -> {
+                        URI uri = URI.create(jenkinsJob + build + CUCUMBER_REPORTS_OVERVIEW_PAGE);
+                        return httpClient.get(uri)
+                            .map(this::getTextFromResponseBody)
+                            .map(this::repairHtml)
+                            .map(text -> parseTestReport(text, build));
+                    })
                     .collect(toList()))
                     .yield()
                     .then(this::renderTestReports)
@@ -199,26 +200,30 @@ public class Main {
             }
         }
 
-        private TestReport parseTestReport(String text) {
+        private TestReport parseTestReport(String text, String build) {
             Document document = readDocument(text);
             XPathFactory xPathFactory = XPathFactory.instance();
 
-            XPathExpression<Element> titleXPath = xPathFactory.compile(
-                "//title", Filters.element());
+            try {
+                XPathExpression<Element> titleXPath = xPathFactory.compile(
+                    "//title", Filters.element());
 
-            Element title = titleXPath.evaluate(document).get(0);
+                Element title = titleXPath.evaluate(document).get(0);
 
-            XPathExpression<Element> rowXPath = xPathFactory.compile(
-                "//td[@class=\"tagname\"]/..", Filters.element());
+                XPathExpression<Element> rowXPath = xPathFactory.compile(
+                    "//td[@class=\"tagname\"]/..", Filters.element());
 
-            List<Element> rows = rowXPath.evaluate(document);
+                List<Element> rows = rowXPath.evaluate(document);
 
-            return new TestReport(
-                StringUtils.substringBetween(title.getText(), "(no ", ")"),
-                rows.stream()
-                    .map(this::mapHtmlRowToTestReportLine)
-                    .collect(toList())
-            );
+                return new TestReport(
+                    StringUtils.substringBetween(title.getText(), "(no ", ")"),
+                    rows.stream()
+                        .map(this::mapHtmlRowToTestReportLine)
+                        .collect(toList())
+                );
+            } catch (RuntimeException e) {
+                throw new RuntimeException(build + ": " + left(text, 200), e);
+            }
         }
 
         private TestReportLine mapHtmlRowToTestReportLine(Element element) {
