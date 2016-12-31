@@ -30,6 +30,7 @@ import java.io.StringReader;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 public class Main {
@@ -154,6 +155,7 @@ public class Main {
                     })
                     .collect(toList()))
                     .yield()
+                    .map(testReports -> testReports.stream().filter(Objects::nonNull).collect(toList()))
                     .then(this::renderTestReports)
                 );
 
@@ -205,6 +207,8 @@ public class Main {
             XPathFactory xPathFactory = XPathFactory.instance();
 
             try {
+                if (text.contains("Not found")) return null;
+
                 XPathExpression<Element> titleXPath = xPathFactory.compile(
                     "//title", Filters.element());
 
