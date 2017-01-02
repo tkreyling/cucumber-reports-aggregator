@@ -293,6 +293,8 @@ public class Main {
             appendLine("<html>");
             appendLine("<head>");
             appendLine("<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />");
+            appendLine("<script type=\"text/javascript\" src=\"js/jquery.min.js\"></script>");
+            appendLine("<script type=\"text/javascript\" src=\"js/bootstrap.min.js\"></script>");
             appendLine("<link rel=\"stylesheet\" href=\"css/bootstrap.min.css\" type=\"text/css\"/>");
             appendLine("<link rel=\"stylesheet\" href=\"css/reporting.css\" type=\"text/css\"/>");
             appendLine("<link rel=\"stylesheet\" href=\"css/font-awesome.min.css\"/>");
@@ -326,6 +328,11 @@ public class Main {
                 appendLine("</tr>");
             });
             appendLine("</table>");
+            appendLine("<script>");
+            appendLine("$(function () {");
+            appendLine("  $('[data-toggle=\"tooltip\"]').tooltip()");
+            appendLine("})");
+            appendLine("</script>");
             appendLine("</body>");
             appendLine("</html>");
 
@@ -359,6 +366,10 @@ public class Main {
             if (status.equals("Failed")) {
                 append("<a href=\"");
                 append(jenkinsJob).append(buildNumber).append(CUCUMBER_REPORTS_PATH).append(featureLink);
+                append("\" data-toggle=\"tooltip\" data-placement=\"left\" title=\"");
+                append(failedAndSkippedSteps);
+                append(" / ");
+                append(totalSteps);
                 append("\">");
                 append("<div class=\"progress center-block\">");
                 append("<div class=\"progress-bar progress-bar-danger\"  role=\"progressbar\"  style=\"width: ");
