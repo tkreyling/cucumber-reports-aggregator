@@ -210,6 +210,7 @@ public class Main {
 
             try {
                 if (text.contains("Not found")) return null;
+                if (text.contains("You have no features in your cucumber report")) return null;
 
                 XPathExpression<Element> titleXPath = xPathFactory.compile(
                     "//title", Filters.element());
