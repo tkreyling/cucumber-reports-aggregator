@@ -9,6 +9,7 @@ import static org.apache.commons.lang3.StringUtils.left;
 import lombok.AllArgsConstructor;
 import lombok.Value;
 import lombok.experimental.NonFinal;
+import ratpack.exec.Promise;
 import ratpack.exec.util.ParallelBatch;
 import ratpack.handling.Context;
 import ratpack.http.MediaType;
@@ -131,31 +132,41 @@ public class Main {
         String jenkinsJob;
         Context context;
         AggregatedReportBuilder aggregatedReportBuilder;
+        HttpClient httpClient;
 
         public JenkinsRequestProcessor(String jenkinsJob, Context context) {
-            this(jenkinsJob, context, new AggregatedReportBuilder(jenkinsJob));
+            this(
+                jenkinsJob,
+                context,
+                new AggregatedReportBuilder(jenkinsJob),
+                context.get(HttpClient.class)
+            );
         }
 
         public void process() {
-            HttpClient httpClient = context.get(HttpClient.class);
+            queryJenkinsJobPage()
+                .flatMap(this::queryAllCucumberReports)
+                .then(this::renderTestReports);
+        }
 
-            httpClient.get(URI.create(jenkinsJob + JENKINS_API_SUFFIX))
+        private Promise<List<String>> queryJenkinsJobPage() {
+            return httpClient.get(URI.create(jenkinsJob + JENKINS_API_SUFFIX))
                 .map(this::getTextFromResponseBody)
-                .map(this::parseBuildNumbersFromJob)
-                .then(builds -> ParallelBatch.of(builds.stream()
-                    .map(build -> {
-                        URI uri = URI.create(jenkinsJob + build + CUCUMBER_REPORTS_OVERVIEW_PAGE);
-                        return httpClient.get(uri)
-                            .map(this::getTextFromResponseBody)
-                            .map(this::repairHtml)
-                            .map(text -> parseTestReport(text, build));
-                    })
-                    .collect(toList()))
-                    .yield()
-                    .map(testReports -> testReports.stream().filter(Objects::nonNull).collect(toList()))
-                    .then(this::renderTestReports)
-                );
+                .map(this::parseBuildNumbersFromJob);
+        }
 
+        private Promise<List<TestReport>> queryAllCucumberReports(List<String> builds) {
+            return ParallelBatch.of(builds.stream()
+                .map(build -> {
+                    URI uri = URI.create(jenkinsJob + build + CUCUMBER_REPORTS_OVERVIEW_PAGE);
+                    return httpClient.get(uri)
+                        .map(this::getTextFromResponseBody)
+                        .map(this::repairHtml)
+                        .map(text -> parseTestReport(text, build));
+                })
+                .collect(toList()))
+                .yield()
+                .map(testReports -> testReports.stream().filter(Objects::nonNull).collect(toList()));
         }
 
         private String getTextFromResponseBody(ReceivedResponse receivedResponse) {
