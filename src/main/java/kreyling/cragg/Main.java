@@ -11,6 +11,7 @@ import lombok.Value;
 import lombok.experimental.NonFinal;
 import ratpack.exec.Promise;
 import ratpack.exec.util.ParallelBatch;
+import ratpack.func.Pair;
 import ratpack.handling.Context;
 import ratpack.http.MediaType;
 import ratpack.http.Status;
@@ -29,9 +30,9 @@ import org.jdom2.xpath.XPathFactory;
 
 import java.io.StringReader;
 import java.net.URI;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Stream;
 
 public class Main {
@@ -145,8 +146,23 @@ public class Main {
 
         public void process() {
             queryJenkinsJobPage()
-                .flatMap(this::queryAllCucumberReports)
+                .flatMap(builds ->
+                    ParallelBatch.of(
+                        builds.stream()
+                            .map(build ->
+                                queryCucumberReport(build).left(queryJenkinsBuildInformation(build)))
+                            .collect(toList())
+                    )
+                        .yield()
+                        .map(this::filterEmptyReports)
+                )
                 .then(this::renderTestReports);
+        }
+
+        private List<? extends Pair<String, TestReport>> filterEmptyReports(List<? extends Pair<String, TestReport>> pairs) {
+            return pairs.stream()
+                .filter(pair -> pair.getRight() != null)
+                .collect(toList());
         }
 
         private Promise<List<String>> queryJenkinsJobPage() {
@@ -155,18 +171,17 @@ public class Main {
                 .map(this::parseBuildNumbersFromJob);
         }
 
-        private Promise<List<TestReport>> queryAllCucumberReports(List<String> builds) {
-            return ParallelBatch.of(builds.stream()
-                .map(build -> {
-                    URI uri = URI.create(jenkinsJob + build + CUCUMBER_REPORTS_OVERVIEW_PAGE);
-                    return httpClient.get(uri)
-                        .map(this::getTextFromResponseBody)
-                        .map(this::repairHtml)
-                        .map(text -> parseTestReport(text, build));
-                })
-                .collect(toList()))
-                .yield()
-                .map(testReports -> testReports.stream().filter(Objects::nonNull).collect(toList()));
+        private Promise<String> queryJenkinsBuildInformation(String build) {
+            return httpClient.get(URI.create(jenkinsJob + build + JENKINS_API_SUFFIX))
+                .map(this::getTextFromResponseBody)
+                .map(text -> parseBuildTimeFromBuildInfo(text, build));
+        }
+
+        private Promise<TestReport> queryCucumberReport(String build) {
+            return httpClient.get(URI.create(jenkinsJob + build + CUCUMBER_REPORTS_OVERVIEW_PAGE))
+                .map(this::getTextFromResponseBody)
+                .map(this::repairHtml)
+                .map(text -> parseTestReport(text, build));
         }
 
         private String getTextFromResponseBody(ReceivedResponse receivedResponse) {
@@ -187,6 +202,19 @@ public class Main {
                 .filter(build -> !build.equals(firstBuild))
                 .filter(build -> !build.equals(lastSuccessfulBuild))
                 .collect(toList());
+        }
+
+        private String parseBuildTimeFromBuildInfo(String text, String build) {
+            Document document = readDocument(text);
+            XPathFactory xPathFactory = XPathFactory.instance();
+
+            try {
+                String durationAsText = getSingleValue("//duration", xPathFactory, document);
+                Duration duration = Duration.ofMillis(Long.parseLong(durationAsText));
+                return duration.toMinutes() + ":" + (duration.getSeconds() % 60);
+            } catch (RuntimeException e) {
+                throw new RuntimeException(build + ": " + left(text, 200), e);
+            }
         }
 
         private String getSingleValue(String query, XPathFactory xPathFactory, Document document) {
@@ -261,8 +289,10 @@ public class Main {
             }
         }
 
-        private void renderTestReports(List<? extends TestReport> testReports) {
+        private void renderTestReports(List<? extends Pair<String, TestReport>> pairs) {
             context.getResponse().status(Status.OK).contentType(MediaType.TEXT_HTML);
+
+            List<TestReport> testReports = pairs.stream().map(Pair::getRight).collect(toList());
 
             List<AggregatedTestReportLine> aggregatedTestReportLines = testReports.stream()
                 .flatMap(TestReport::getAllFeatures)
@@ -271,7 +301,7 @@ public class Main {
                 .sorted(comparing(AggregatedTestReportLine::getFeature))
                 .collect(toList());
 
-            context.render(aggregatedReportBuilder.buildHtml(testReports, aggregatedTestReportLines));
+            context.render(aggregatedReportBuilder.buildHtml(pairs, aggregatedTestReportLines));
         }
 
         private AggregatedTestReportLine createAggregatedTestReportLine(
@@ -295,7 +325,7 @@ public class Main {
         StringBuilder response = new StringBuilder();
 
         private String buildHtml(
-            List<? extends TestReport> testReports,
+            List<? extends Pair<String, TestReport>> pairs,
             List<AggregatedTestReportLine> aggregatedTestReportLines
         ) {
             appendLine("<!DOCTYPE html>");
@@ -312,13 +342,18 @@ public class Main {
             appendLine("<thead>");
             appendLine("<tr class=\"header dont-sort\">");
             appendLine("<th>Feature</th>");
-            testReports.stream().sorted(comparing(TestReport::getBuildNumber)).forEach(testReport -> {
-                append("<th>");
-                append("<a href=\"").append(jenkinsJob).append(testReport.buildNumber).append("/\">");
-                append(testReport.buildNumber);
-                append("</a>");
-                appendLine("</th>");
-            });
+            pairs.stream()
+                .sorted(comparing(pair -> pair.getRight().buildNumber))
+                .forEach(pair -> {
+                    TestReport testReport = pair.getRight();
+                    append("<th>");
+                    append("<a href=\"").append(jenkinsJob).append(testReport.buildNumber).append("/\">");
+                    append(testReport.buildNumber);
+                    append("</a>");
+                    append("<br/>");
+                    append(pair.getLeft());
+                    appendLine("</th>");
+                });
             appendLine("</tr>");
             appendLine("</thead>");
 
