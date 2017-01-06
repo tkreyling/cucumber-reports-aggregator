@@ -40,8 +40,6 @@ public class Main {
     public static final String CUCUMBER_REPORTS_PATH = "/cucumber-html-reports/";
     public static final String CUCUMBER_REPORTS_OVERVIEW_PAGE = CUCUMBER_REPORTS_PATH + "feature-overview.html";
 
-    public static final boolean TWO_COLUMNS = false;
-
     public static void main(String... args) throws Exception {
         String jenkinsJob = args[0];
 
@@ -304,11 +302,7 @@ public class Main {
             appendLine("<tr class=\"header dont-sort\">");
             appendLine("<th>Feature</th>");
             testReports.stream().sorted(comparing(TestReport::getBuildNumber)).forEach(testReport -> {
-                if (TWO_COLUMNS) {
-                    append("<th colspan=\"2\">");
-                } else {
-                    append("<th>");
-                }
+                append("<th>");
                 append("<a href=\"").append(jenkinsJob).append(testReport.buildNumber).append("/\">");
                 append(testReport.buildNumber);
                 append("</a>");
@@ -338,20 +332,6 @@ public class Main {
             String status = testReportLineWithBuildNumber.testReportLine.status;
             int failedAndSkippedSteps = testReportLineWithBuildNumber.testReportLine.getFailedAndSkippedStepsInt();
             int totalSteps = testReportLineWithBuildNumber.testReportLine.getTotalStepsInt();
-
-            if (TWO_COLUMNS) {
-                append("<td class=\"");
-                append(status.toLowerCase());
-                append("\">");
-                if (status.equals("Failed")) {
-                     append(failedAndSkippedSteps);
-                     append(" / ");
-                     append(totalSteps);
-                     append(" ");
-                }
-                append(status.toLowerCase());
-                append("</td>");
-            }
 
             append("<td class=\"");
             append(status.toLowerCase());
@@ -387,11 +367,6 @@ public class Main {
         }
 
         private AggregatedReportBuilder append(int number) {
-            response.append(number);
-            return this;
-        }
-
-        private AggregatedReportBuilder append(double number) {
             response.append(number);
             return this;
         }
