@@ -29,6 +29,7 @@ import org.jdom2.xpath.XPathExpression;
 import org.jdom2.xpath.XPathFactory;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
+import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.PeriodFormatter;
 import org.joda.time.format.PeriodFormatterBuilder;
 
@@ -112,6 +113,14 @@ public class Main {
                 .appendSeconds()
                 .toFormatter();
             return minutesAndSeconds.print(duration.toPeriod());
+        }
+
+        public String getStartedAtDateFormatted() {
+            return DateTimeFormat.forPattern("dd.MM.").print(startedAt);
+        }
+
+        public String getStartedAtTimeFormatted() {
+            return DateTimeFormat.forPattern("HH:mm").print(startedAt);
         }
     }
 
@@ -233,7 +242,10 @@ public class Main {
                 String durationAsText = getSingleValue("//duration", xPathFactory, document);
                 Duration duration = new Duration(Long.parseLong(durationAsText));
 
-                return new Build(build, duration, null);
+                String startedAtAsText = getSingleValue("//timestamp", xPathFactory, document);
+                DateTime startedAt = new DateTime(Long.parseLong(startedAtAsText));
+
+                return new Build(build, duration, startedAt);
             } catch (RuntimeException e) {
                 throw new RuntimeException(build + ": " + left(text, 200), e);
             }
@@ -374,6 +386,10 @@ public class Main {
                     append("</a>");
                     append("<br/>");
                     append(pair.getLeft().getDurationFormatted());
+                    append("<br/>");
+                    append(pair.getLeft().getStartedAtDateFormatted());
+                    append("<br/>");
+                    append(pair.getLeft().getStartedAtTimeFormatted());
                     appendLine("</th>");
                 });
             appendLine("</tr>");
