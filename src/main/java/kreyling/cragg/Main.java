@@ -27,6 +27,7 @@ import org.jdom2.filter.Filters;
 import org.jdom2.input.SAXBuilder;
 import org.jdom2.xpath.XPathExpression;
 import org.jdom2.xpath.XPathFactory;
+import org.joda.time.DateTime;
 import org.joda.time.Duration;
 import org.joda.time.format.PeriodFormatter;
 import org.joda.time.format.PeriodFormatterBuilder;
@@ -97,6 +98,24 @@ public class Main {
     }
 
     @Value
+    private static class Build {
+        public String buildNumber;
+        public Duration duration;
+        public DateTime startedAt;
+
+        public String getDurationFormatted() {
+            PeriodFormatter minutesAndSeconds = new PeriodFormatterBuilder()
+                .printZeroAlways()
+                .appendMinutes()
+                .appendSeparator(":")
+                .minimumPrintedDigits(2)
+                .appendSeconds()
+                .toFormatter();
+            return minutesAndSeconds.print(duration.toPeriod());
+        }
+    }
+
+    @Value
     private static class TestReport {
         public String buildNumber;
         Map<String, List<TestReportLine>> testReportLinesByFeature;
@@ -161,7 +180,7 @@ public class Main {
                 .then(this::renderTestReports);
         }
 
-        private List<? extends Pair<String, TestReport>> filterEmptyReports(List<? extends Pair<String, TestReport>> pairs) {
+        private <T> List<? extends Pair<T, TestReport>> filterEmptyReports(List<? extends Pair<T, TestReport>> pairs) {
             return pairs.stream()
                 .filter(pair -> pair.getRight() != null)
                 .collect(toList());
@@ -173,10 +192,10 @@ public class Main {
                 .map(this::parseBuildNumbersFromJob);
         }
 
-        private Promise<String> queryJenkinsBuildInformation(String build) {
+        private Promise<Build> queryJenkinsBuildInformation(String build) {
             return httpClient.get(URI.create(jenkinsJob + build + JENKINS_API_SUFFIX))
                 .map(this::getTextFromResponseBody)
-                .map(text -> parseBuildTimeFromBuildInfo(text, build));
+                .map(text -> parseBuildInfo(text, build));
         }
 
         private Promise<TestReport> queryCucumberReport(String build) {
@@ -206,22 +225,15 @@ public class Main {
                 .collect(toList());
         }
 
-        private String parseBuildTimeFromBuildInfo(String text, String build) {
+        private Build parseBuildInfo(String text, String build) {
             Document document = readDocument(text);
             XPathFactory xPathFactory = XPathFactory.instance();
 
             try {
                 String durationAsText = getSingleValue("//duration", xPathFactory, document);
-
                 Duration duration = new Duration(Long.parseLong(durationAsText));
-                PeriodFormatter minutesAndSeconds = new PeriodFormatterBuilder()
-                    .printZeroAlways()
-                    .appendMinutes()
-                    .appendSeparator(":")
-                    .minimumPrintedDigits(2)
-                    .appendSeconds()
-                    .toFormatter();
-                return minutesAndSeconds.print(duration.toPeriod());
+
+                return new Build(build, duration, null);
             } catch (RuntimeException e) {
                 throw new RuntimeException(build + ": " + left(text, 200), e);
             }
@@ -299,7 +311,7 @@ public class Main {
             }
         }
 
-        private void renderTestReports(List<? extends Pair<String, TestReport>> pairs) {
+        private void renderTestReports(List<? extends Pair<Build, TestReport>> pairs) {
             context.getResponse().status(Status.OK).contentType(MediaType.TEXT_HTML);
 
             List<TestReport> testReports = pairs.stream().map(Pair::getRight).collect(toList());
@@ -335,7 +347,7 @@ public class Main {
         StringBuilder response = new StringBuilder();
 
         private String buildHtml(
-            List<? extends Pair<String, TestReport>> pairs,
+            List<? extends Pair<Build, TestReport>> pairs,
             List<AggregatedTestReportLine> aggregatedTestReportLines
         ) {
             appendLine("<!DOCTYPE html>");
@@ -361,7 +373,7 @@ public class Main {
                     append(testReport.buildNumber);
                     append("</a>");
                     append("<br/>");
-                    append(pair.getLeft());
+                    append(pair.getLeft().getDurationFormatted());
                     appendLine("</th>");
                 });
             appendLine("</tr>");
