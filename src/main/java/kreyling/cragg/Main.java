@@ -27,10 +27,12 @@ import org.jdom2.filter.Filters;
 import org.jdom2.input.SAXBuilder;
 import org.jdom2.xpath.XPathExpression;
 import org.jdom2.xpath.XPathFactory;
+import org.joda.time.Duration;
+import org.joda.time.format.PeriodFormatter;
+import org.joda.time.format.PeriodFormatterBuilder;
 
 import java.io.StringReader;
 import java.net.URI;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -210,8 +212,16 @@ public class Main {
 
             try {
                 String durationAsText = getSingleValue("//duration", xPathFactory, document);
-                Duration duration = Duration.ofMillis(Long.parseLong(durationAsText));
-                return duration.toMinutes() + ":" + (duration.getSeconds() % 60);
+
+                Duration duration = new Duration(Long.parseLong(durationAsText));
+                PeriodFormatter minutesAndSeconds = new PeriodFormatterBuilder()
+                    .printZeroAlways()
+                    .appendMinutes()
+                    .appendSeparator(":")
+                    .minimumPrintedDigits(2)
+                    .appendSeconds()
+                    .toFormatter();
+                return minutesAndSeconds.print(duration.toPeriod());
             } catch (RuntimeException e) {
                 throw new RuntimeException(build + ": " + left(text, 200), e);
             }
