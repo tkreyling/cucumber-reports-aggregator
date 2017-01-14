@@ -19,8 +19,11 @@ dependencies {
     compile "jaxen:jaxen:1.1.6"
     compile "org.apache.commons:commons-lang3:3.5"
     compile "joda-time:joda-time:2.9.7"
+
     compileOnly "org.projectlombok:lombok:1.16.12"
+
     runtime "org.slf4j:slf4j-simple:1.7.21"
+
     testCompile "junit:junit:4.12"
     testCompile "org.hamcrest:hamcrest-library:1.3"
 }

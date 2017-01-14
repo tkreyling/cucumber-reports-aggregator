@@ -1,0 +1,66 @@
+<mavenModuleSetBuild _class="hudson.maven.MavenModuleSetBuild">
+    <action _class="hudson.model.CauseAction">
+        <cause _class="hudson.model.Cause$UserIdCause">
+            <shortDescription>Gestartet durch Benutzer Kreyling, Thomas (ext)</shortDescription>
+            <userName>Kreyling, Thomas (ext)</userName>
+        </cause>
+    </action>
+    <action/>
+    <action _class="hudson.plugins.git.util.BuildData">
+        <buildsByBranchName>
+            <refsremotesorigindevelop _class="hudson.plugins.git.util.Build">
+                <buildNumber>1485</buildNumber>
+                <marked>
+                    <SHA1>28d6786f36639922fe5830f5414a6dfbc22258ec</SHA1>
+                    <branch>
+                        <SHA1>28d6786f36639922fe5830f5414a6dfbc22258ec</SHA1>
+                        <name>refs/remotes/origin/develop</name>
+                    </branch>
+                </marked>
+                <revision>
+                    <SHA1>28d6786f36639922fe5830f5414a6dfbc22258ec</SHA1>
+                    <branch>
+                        <SHA1>28d6786f36639922fe5830f5414a6dfbc22258ec</SHA1>
+                        <name>refs/remotes/origin/develop</name>
+                    </branch>
+                </revision>
+            </refsremotesorigindevelop>
+        </buildsByBranchName>
+        <lastBuiltRevision>
+            <SHA1>28d6786f36639922fe5830f5414a6dfbc22258ec</SHA1>
+            <branch>
+                <SHA1>28d6786f36639922fe5830f5414a6dfbc22258ec</SHA1>
+                <name>refs/remotes/origin/develop</name>
+            </branch>
+        </lastBuiltRevision>
+        <scmName/>
+    </action>
+    <action _class="hudson.plugins.git.GitTagAction"/>
+    <action/>
+    <action _class="hudson.maven.reporters.SurefireAggregatedReport">
+        <failCount>22</failCount>
+        <skipCount>22</skipCount>
+        <totalCount>1242</totalCount>
+        <urlName>testReport</urlName>
+    </action>
+    <action _class="hudson.maven.reporters.MavenAggregatedArtifactRecord"/>
+    <action/>
+    <action/>
+    <action/>
+    <action/>
+    <building>false</building>
+    <displayName>#1485</displayName>
+    <duration>2787627</duration>
+    <estimatedDuration>2282033</estimatedDuration>
+    <id>1485</id>
+    <keepLog>false</keepLog>
+    <number>1485</number>
+    <queueId>1531</queueId>
+    <result>FAILURE</result>
+    <timestamp>1484211350375</timestamp>
+    <changeSet _class="hudson.plugins.git.GitChangeSetList">
+        <kind>git</kind>
+    </changeSet>
+    <mavenArtifacts/>
+    <mavenVersionUsed>3.2.3</mavenVersionUsed>
+</mavenModuleSetBuild>

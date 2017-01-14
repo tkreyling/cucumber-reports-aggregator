@@ -37,6 +37,7 @@ import java.io.StringReader;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 public class Main {
@@ -53,7 +54,7 @@ public class Main {
             .serverConfig(c -> c.baseDir(BaseDir.find()).build())
             .handlers(chain -> chain
                     .files(files -> files.dir("static"))
-                    .get(context -> new JenkinsRequestProcessor(jenkinsJob, context).process())
+                    .get(context -> new JenkinsRequestProcessor(jenkinsJob, context, context.get(HttpClient.class)).process())
             )
         );
     }
@@ -99,10 +100,11 @@ public class Main {
     }
 
     @Value
-    private static class Build {
+    static class Build {
         public String buildNumber;
         public Duration duration;
         public DateTime startedAt;
+        public Optional<String> startedByUser;
 
         public String getDurationFormatted() {
             PeriodFormatter minutesAndSeconds = new PeriodFormatterBuilder()
@@ -187,18 +189,18 @@ public class Main {
 
     @Value
     @AllArgsConstructor
-    private static class JenkinsRequestProcessor {
+    static class JenkinsRequestProcessor {
         String jenkinsJob;
         Context context;
         AggregatedReportBuilder aggregatedReportBuilder;
         HttpClient httpClient;
 
-        public JenkinsRequestProcessor(String jenkinsJob, Context context) {
+        public JenkinsRequestProcessor(String jenkinsJob, Context context, HttpClient httpClient) {
             this(
                 jenkinsJob,
                 context,
                 new AggregatedReportBuilder(jenkinsJob),
-                context.get(HttpClient.class)
+                httpClient
             );
         }
 
@@ -252,8 +254,8 @@ public class Main {
 
             XPathExpression<Element> buildXPath = xPathFactory.compile("//build/number", Filters.element());
 
-            String lastSuccessfulBuild = getSingleValue("//lastSuccessfulBuild/number", xPathFactory, document);
-            String firstBuild = getSingleValue("//firstBuild/number", xPathFactory, document);
+            String lastSuccessfulBuild = getSingleValue("//lastSuccessfulBuild/number", xPathFactory, document).get();
+            String firstBuild = getSingleValue("//firstBuild/number", xPathFactory, document).get();
 
             return buildXPath.evaluate(document).stream()
                 .map(Element::getText)
@@ -263,25 +265,33 @@ public class Main {
         }
 
         private Build parseBuildInfo(String text, String build) {
-            Document document = readDocument(text);
-            XPathFactory xPathFactory = XPathFactory.instance();
-
             try {
-                String durationAsText = getSingleValue("//duration", xPathFactory, document);
-                Duration duration = new Duration(Long.parseLong(durationAsText));
-
-                String startedAtAsText = getSingleValue("//timestamp", xPathFactory, document);
-                DateTime startedAt = new DateTime(Long.parseLong(startedAtAsText));
-
-                return new Build(build, duration, startedAt);
+                return parseBuildInfo(readDocument(text), build);
             } catch (RuntimeException e) {
                 throw new RuntimeException(build + ": " + left(text, 200), e);
             }
         }
 
-        private String getSingleValue(String query, XPathFactory xPathFactory, Document document) {
+        Build parseBuildInfo(Document document, String build) {
+            XPathFactory xPathFactory = XPathFactory.instance();
+
+            Duration duration = getSingleValue("//duration", xPathFactory, document)
+                .map(Long::parseLong).map(Duration::new).get();
+
+            DateTime startedAt = getSingleValue("//timestamp", xPathFactory, document)
+                .map(Long::parseLong).map(DateTime::new).get();
+
+            Optional<String> startedByUser = getSingleValue("//cause/userName", xPathFactory, document)
+                .map(name -> StringUtils.removeEnd(name, " (ext)"));
+
+            return new Build(build, duration, startedAt, startedByUser);
+        }
+
+        private Optional<String> getSingleValue(String query, XPathFactory xPathFactory, Document document) {
             XPathExpression<Element> xPathExpression = xPathFactory.compile(query, Filters.element());
-            return xPathExpression.evaluate(document).get(0).getText();
+            List<Element> elements = xPathExpression.evaluate(document);
+            if (elements.isEmpty()) return Optional.empty();
+            return Optional.of(elements.get(0).getText());
         }
 
         private String repairHtml(String text) {
@@ -394,6 +404,8 @@ public class Main {
             appendLine("<html>");
             appendLine("<head>");
             appendLine("<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />");
+            appendLine("<script type=\"text/javascript\" src=\"js/jquery.min.js\"></script>");
+            appendLine("<script type=\"text/javascript\" src=\"js/bootstrap.min.js\"></script>");
             appendLine("<link rel=\"stylesheet\" href=\"css/bootstrap.min.css\" type=\"text/css\"/>");
             appendLine("<link rel=\"stylesheet\" href=\"css/reporting.css\" type=\"text/css\"/>");
             appendLine("<link rel=\"stylesheet\" href=\"css/font-awesome.min.css\"/>");
@@ -429,20 +441,25 @@ public class Main {
                 .sorted(comparing(pair -> pair.getRight().buildNumber))
                 .forEach(pair -> {
                     TestReport testReport = pair.getRight();
+                    Build build = pair.getLeft();
                     append("<th");
                     if (testReport.isSystemFailure()) {
                         append(" class=\"system-failure\"");
                     }
-                    append(">");
+                    appendLine(">");
+                    append("<div data-toggle=\"tooltip\" data-placement=\"bottom\" title=\"");
+                    append(build.startedByUser.orElse("started by other job"));
+                    appendLine("\">");
                     append("<a href=\"").append(jenkinsJob).append(testReport.buildNumber).append("/\">");
                     append(testReport.buildNumber);
                     append("</a>");
                     append("<br/>");
-                    append(pair.getLeft().getDurationFormatted());
+                    append(build.getDurationFormatted());
                     append("<br/>");
-                    append(pair.getLeft().getStartedAtDateFormatted());
+                    append(build.getStartedAtDateFormatted());
                     append("<br/>");
-                    append(pair.getLeft().getStartedAtTimeFormatted());
+                    appendLine(build.getStartedAtTimeFormatted());
+                    appendLine("</div>");
                     appendLine("</th>");
                 });
             appendLine("</tr>");
@@ -457,6 +474,11 @@ public class Main {
                 appendLine("</tr>");
             });
             appendLine("</table>");
+            appendLine("<script>");
+            appendLine("$(function () {");
+            appendLine("  $('[data-toggle=\"tooltip\"]').tooltip()");
+            appendLine("})");
+            appendLine("</script>");
             appendLine("</body>");
             appendLine("</html>");
 
