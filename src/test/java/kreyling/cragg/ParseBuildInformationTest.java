@@ -24,7 +24,6 @@ public class ParseBuildInformationTest {
         assertThat(build.buildNumber, is("testrun"));
         assertThat(build.startedByUser, is(Optional.of("Kreyling, Thomas")));
         assertThat(build.upstreamBuild, is(Optional.empty()));
-        assertThat(build.upstreamUrl, is(Optional.empty()));
         assertThat(build.scmChanges.size(), is(0));
     }
 
@@ -36,8 +35,8 @@ public class ParseBuildInformationTest {
 
         assertThat(build.buildNumber, is("testrun"));
         assertThat(build.startedByUser, is(Optional.empty()));
-        assertThat(build.upstreamBuild, is(Optional.of("1518")));
-        assertThat(build.upstreamUrl, is(Optional.of("job/some-other-project/")));
+        assertThat(build.upstreamBuild.get().number, is("1518"));
+        assertThat(build.upstreamBuild.get().upstreamUrl, is("job/some-other-project/"));
         assertThat(build.scmChanges.size(), is(0));
     }
 
@@ -50,7 +49,6 @@ public class ParseBuildInformationTest {
         assertThat(build.buildNumber, is("testrun"));
         assertThat(build.startedByUser, is(Optional.empty()));
         assertThat(build.upstreamBuild, is(Optional.empty()));
-        assertThat(build.upstreamUrl, is(Optional.empty()));
 
         assertThat(build.scmChanges.size(), is(2));
         assertThat(build.scmChanges.get(0).user, is("Mustermann, Max"));

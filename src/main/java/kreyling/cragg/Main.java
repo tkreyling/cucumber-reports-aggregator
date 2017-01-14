@@ -111,8 +111,7 @@ public class Main {
         public Duration duration;
         public DateTime startedAt;
         public Optional<String> startedByUser;
-        public Optional<String> upstreamBuild;
-        public Optional<String> upstreamUrl;
+        public Optional<BuildReference> upstreamBuild;
         public List<ScmChange> scmChanges;
 
         public String getDurationFormatted() {
@@ -133,6 +132,12 @@ public class Main {
         public String getStartedAtTimeFormatted() {
             return DateTimeFormat.forPattern("HH:mm").print(startedAt);
         }
+    }
+
+    @Value
+    static class BuildReference {
+        public String number;
+        public String upstreamUrl;
     }
 
     @Value
@@ -262,7 +267,7 @@ public class Main {
             return queryJenkinsBuildInformation(jenkinsJob, build)
                 .flatMap(buildInfo -> {
                     if (buildInfo.upstreamBuild.isPresent()) {
-                        return queryJenkinsBuildInformation(buildInfo.upstreamUrl.get(), buildInfo.upstreamBuild.get())
+                        return queryJenkinsBuildInformation(buildInfo.upstreamBuild.get().upstreamUrl, buildInfo.upstreamBuild.get().getNumber())
                             .map(upstreamBuild -> new BuildAndUpstreamBuild(buildInfo, Optional.of(upstreamBuild)));
                     } else {
                         return Promise.value(new BuildAndUpstreamBuild(buildInfo, Optional.empty()));
@@ -323,13 +328,19 @@ public class Main {
             Optional<String> startedByUser = getSingleValue("//cause/userName", xPathFactory, document)
                 .map(this::removeExtSuffix);
 
-            Optional<String> upstreamBuild = getSingleValue("//cause/upstreamBuild", xPathFactory, document);
-
-            Optional<String> upstreamUrl = getSingleValue("//cause/upstreamUrl", xPathFactory, document);
+            Optional<BuildReference> upstreamBuild = parseUpstreamBuild(xPathFactory, document);
 
             List<ScmChange> scmChanges = parseScmChanges(xPathFactory, document);
 
-            return new Build(build, duration, startedAt, startedByUser, upstreamBuild, upstreamUrl, scmChanges);
+            return new Build(build, duration, startedAt, startedByUser, upstreamBuild, scmChanges);
+        }
+
+        private Optional<BuildReference> parseUpstreamBuild(XPathFactory xPathFactory, Document document) {
+            return getSingleValue("//cause/upstreamBuild", xPathFactory, document)
+                .map(number -> new BuildReference(
+                    number,
+                    getSingleValue("//cause/upstreamUrl", xPathFactory, document).get()
+                ));
         }
 
         private List<ScmChange> parseScmChanges(XPathFactory xPathFactory, Document document) {
@@ -521,10 +532,10 @@ public class Main {
                     appendLine(build.getStartedAtTimeFormatted());
                     optionalUpstreamBuild.ifPresent(upstreamBuild -> {
                         append("<a href=\"").append(host)
-                            .append(upstreamBuild.upstreamUrl.get())
-                            .append(upstreamBuild.upstreamBuild.get())
+                            .append(upstreamBuild.upstreamBuild.get().upstreamUrl)
+                            .append(upstreamBuild.upstreamBuild.get().number)
                             .append("/\">");
-                        append(upstreamBuild.upstreamBuild.get());
+                        append(upstreamBuild.upstreamBuild.get().number);
                         append("</a>");
                     });
                     build.startedByUser.ifPresent(startedByUser -> {
