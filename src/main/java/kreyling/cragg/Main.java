@@ -113,6 +113,7 @@ public class Main {
         public Optional<String> startedByUser;
         public Optional<String> upstreamBuild;
         public Optional<String> upstreamUrl;
+        public List<ScmChange> scmChanges;
 
         public String getDurationFormatted() {
             PeriodFormatter minutesAndSeconds = new PeriodFormatterBuilder()
@@ -131,6 +132,16 @@ public class Main {
 
         public String getStartedAtTimeFormatted() {
             return DateTimeFormat.forPattern("HH:mm").print(startedAt);
+        }
+    }
+
+    @Value
+    static class ScmChange {
+        public String user;
+        public String comment;
+
+        public String getFirstLineOfComment() {
+            return StringUtils.split(comment, "\n")[0];
         }
     }
 
@@ -310,13 +321,30 @@ public class Main {
                 .map(Long::parseLong).map(DateTime::new).get();
 
             Optional<String> startedByUser = getSingleValue("//cause/userName", xPathFactory, document)
-                .map(name -> StringUtils.removeEnd(name, " (ext)"));
+                .map(this::removeExtSuffix);
 
             Optional<String> upstreamBuild = getSingleValue("//cause/upstreamBuild", xPathFactory, document);
 
             Optional<String> upstreamUrl = getSingleValue("//cause/upstreamUrl", xPathFactory, document);
 
-            return new Build(build, duration, startedAt, startedByUser, upstreamBuild, upstreamUrl);
+            List<ScmChange> scmChanges = parseScmChanges(xPathFactory, document);
+
+            return new Build(build, duration, startedAt, startedByUser, upstreamBuild, upstreamUrl, scmChanges);
+        }
+
+        private List<ScmChange> parseScmChanges(XPathFactory xPathFactory, Document document) {
+            XPathExpression<Element> scmChangesXPath = xPathFactory.compile("//changeSet/item", Filters.element());
+
+            return scmChangesXPath.evaluate(document).stream()
+                .map(element -> new ScmChange(
+                    removeExtSuffix(element.getChild("author").getChildText("fullName")),
+                    element.getChildText("comment")
+                ))
+                .collect(toList());
+        }
+
+        private String removeExtSuffix(String name) {
+            return StringUtils.removeEnd(name, " (ext)");
         }
 
         private Optional<String> getSingleValue(String query, XPathFactory xPathFactory, Document document) {
@@ -469,7 +497,8 @@ public class Main {
             appendLine("<table class=\"stats-table table-hover\">");
             appendLine("<thead>");
             appendLine("<tr class=\"header dont-sort\">");
-            appendLine("<th>Feature <button id=\"toggle-system-failures-button\" type=\"button\" class=\"btn btn-default\" onclick=\"toggleSystemFailures()\">Hide System Failures</button></th>");
+            appendLine(
+                "<th>Feature <button id=\"toggle-system-failures-button\" type=\"button\" class=\"btn btn-default\" onclick=\"toggleSystemFailures()\">Hide System Failures</button></th>");
             pairs.stream()
                 .sorted(comparing(pair -> pair.getRight().buildNumber))
                 .forEach(pair -> {
@@ -491,7 +520,10 @@ public class Main {
                     append("<br/>");
                     appendLine(build.getStartedAtTimeFormatted());
                     optionalUpstreamBuild.ifPresent(upstreamBuild -> {
-                        append("<a href=\"").append(host).append(upstreamBuild.upstreamUrl.get()).append(upstreamBuild.upstreamBuild.get()).append("/\">");
+                        append("<a href=\"").append(host)
+                            .append(upstreamBuild.upstreamUrl.get())
+                            .append(upstreamBuild.upstreamBuild.get())
+                            .append("/\">");
                         append(upstreamBuild.upstreamBuild.get());
                         append("</a>");
                     });
@@ -500,6 +532,13 @@ public class Main {
                         append(startedByUser);
                         append("\">User<span>");
                     });
+                    if (!build.scmChanges.isEmpty()) {
+                        append("<span data-toggle=\"tooltip\" data-html=\"true\" data-placement=\"bottom\" title=\"");
+                        append(build.scmChanges.stream()
+                            .map(scmChange -> scmChange.user + "<br/>" + scmChange.getFirstLineOfComment())
+                            .collect(joining("<br/>")));
+                        append("\">E2E<span>");
+                    }
                     appendLine("</th>");
                 });
             appendLine("</tr>");

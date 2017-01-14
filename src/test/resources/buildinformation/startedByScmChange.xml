@@ -1,0 +1,65 @@
+<mavenModuleSetBuild _class="hudson.maven.MavenModuleSetBuild">
+    <action _class="hudson.model.CauseAction">
+        <cause _class="hudson.triggers.SCMTrigger$SCMTriggerCause">
+            <shortDescription>Build wurde durch eine SCM-Änderung ausgelöst.</shortDescription>
+        </cause>
+    </action>
+    <action/>
+    <action/>
+    <action _class="hudson.plugins.git.GitTagAction"/>
+    <action/>
+    <action _class="hudson.maven.reporters.SurefireAggregatedReport">
+        <failCount>40</failCount>
+        <skipCount>50</skipCount>
+        <totalCount>1242</totalCount>
+        <urlName>testReport</urlName>
+    </action>
+    <action _class="hudson.maven.reporters.MavenAggregatedArtifactRecord"/>
+    <action/>
+    <action/>
+    <action/>
+    <action/>
+    <building>false</building>
+    <displayName>#1480</displayName>
+    <duration>2665652</duration>
+    <estimatedDuration>2282033</estimatedDuration>
+    <id>1480</id>
+    <keepLog>false</keepLog>
+    <number>1480</number>
+    <queueId>1314</queueId>
+    <result>FAILURE</result>
+    <timestamp>1484160669772</timestamp>
+    <changeSet _class="hudson.plugins.git.GitChangeSetList">
+        <item _class="hudson.plugins.git.GitChangeSet">
+            <commitId>ab79615d7dd66d5863fcfc4d9fa2645d3c602248</commitId>
+            <timestamp>1484159207000</timestamp>
+            <author>
+                <fullName>Mustermann, Max (ext)</fullName>
+            </author>
+            <comment>ABCD-3656 Überschrift des Kommentars
+                - Erste Zeile
+                - Längere zweite Zeile (mit Kram hinten dran)
+            </comment>
+            <date>2017-01-11 19:26:47 +0100</date>
+            <id>ab79615d7dd66d5863fcfc4d9fa2645d3c602248</id>
+            <msg>ABCD-3656 Überschrift des Kommentars</msg>
+        </item>
+        <item _class="hudson.plugins.git.GitChangeSet">
+            <commitId>ef0ae6de60ec2e580d66127b547e7aedf7849374</commitId>
+            <timestamp>1484159978000</timestamp>
+            <author>
+                <absoluteUrl>https://jenkins.easycredit.intern/user/803403</absoluteUrl>
+                <fullName>Exemplaris, Enrico (ext)</fullName>
+            </author>
+            <comment>ABCD-3477 Überschrift des anderen Kommentars
+                Wichtige Korrektur der Tests
+            </comment>
+            <date>2017-01-11 19:39:38 +0100</date>
+            <id>ef0ae6de60ec2e580d66127b547e7aedf7849374</id>
+            <msg>ABCD-3477 Überschrift des anderen Kommentars</msg>
+        </item>
+        <kind>git</kind>
+    </changeSet>
+    <mavenArtifacts/>
+    <mavenVersionUsed>3.2.3</mavenVersionUsed>
+</mavenModuleSetBuild>
