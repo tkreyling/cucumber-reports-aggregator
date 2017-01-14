@@ -125,12 +125,14 @@ public class Main {
     }
 
     @Value
-    private static class TestReport {
-        public String buildNumber;
+    static class TestReport {
+        String buildNumber;
+        List<TestReportLine> testReportLines;
         Map<String, List<TestReportLine>> testReportLinesByFeature;
 
         public TestReport(String buildNumber, List<TestReportLine> testReportLines) {
             this.buildNumber = buildNumber;
+            this.testReportLines = testReportLines;
             testReportLinesByFeature = testReportLines.stream().collect(groupingBy(TestReportLine::getFeature));
         }
 
@@ -143,18 +145,44 @@ public class Main {
 
             return testReportLinesByFeature.get(feature).get(0);
         }
+
+        public boolean isSystemFailure() {
+            double numberOfFeatures = testReportLines.size();
+
+            List<String> sortedStatus = testReportLines.stream()
+                .sorted(comparing(TestReportLine::getFeature))
+                .map(TestReportLine::getStatus)
+                .collect(toList());
+
+            double directlySuccessionalFailures = countDirectlySuccessionalFailures(sortedStatus);
+
+            return directlySuccessionalFailures / numberOfFeatures  > 0.4;
+        }
+
+        static int countDirectlySuccessionalFailures(List<String> sortedStatus) {
+            int directlySuccessionalFailures = 0;
+            int maxDirectlySuccessionalFailures = 0;
+
+            for (String status : sortedStatus) {
+                if (status.equals("Failed")) {
+                    directlySuccessionalFailures ++;
+
+                    if (directlySuccessionalFailures >= maxDirectlySuccessionalFailures) {
+                        maxDirectlySuccessionalFailures = directlySuccessionalFailures;
+                    }
+                } else {
+                    directlySuccessionalFailures = 0;
+                }
+            }
+
+            return maxDirectlySuccessionalFailures;
+        }
     }
 
     @Value
     private static class AggregatedTestReportLine {
         String feature;
-        List<TestReportLineWithBuildNumber> testReportLinesWithBuildNumber;
-    }
-
-    @Value
-    private static class TestReportLineWithBuildNumber {
-        TestReportLine testReportLine;
-        String buildNumber;
+        List<Pair<TestReportLine, TestReport>> testReportLinesAndTestReport;
     }
 
     @Value
@@ -342,11 +370,11 @@ public class Main {
             List<? extends TestReport> testReports,
             String feature
         ) {
-            List<TestReportLineWithBuildNumber> allTestReportLinesForThisFeature = testReports.stream()
-                .map(testReport -> new TestReportLineWithBuildNumber(
+            List<Pair<TestReportLine, TestReport>> allTestReportLinesForThisFeature = testReports.stream()
+                .map(testReport -> Pair.of(
                     testReport.getTestReportLineByFeature(feature),
-                    testReport.buildNumber))
-                .sorted(comparing(TestReportLineWithBuildNumber::getBuildNumber))
+                    testReport))
+                .sorted(comparing(pair -> pair.getRight().buildNumber))
                 .collect(toList());
 
             return new AggregatedTestReportLine(feature, allTestReportLinesForThisFeature);
@@ -370,17 +398,42 @@ public class Main {
             appendLine("<link rel=\"stylesheet\" href=\"css/reporting.css\" type=\"text/css\"/>");
             appendLine("<link rel=\"stylesheet\" href=\"css/font-awesome.min.css\"/>");
             appendLine("<link rel=\"stylesheet\" href=\"css/progressbar.css\"/>");
+            appendLine("<script>");
+            appendLine("function toggleSystemFailures() {");
+            appendLine("	var button = document.getElementById('toggle-system-failures-button');");
+            appendLine("	");
+            appendLine("	if (button.innerText === 'Hide System Failures') {");
+            appendLine("		button.innerText = 'Show System Failures';");
+            appendLine("		setDisplayForSystemFailureCellsTo('none');");
+            appendLine("	} else {");
+            appendLine("		button.innerText = 'Hide System Failures';");
+            appendLine("		setDisplayForSystemFailureCellsTo('');");
+            appendLine("	}");
+            appendLine("}");
+            appendLine("");
+            appendLine("function setDisplayForSystemFailureCellsTo(value) {");
+            appendLine("	var systemFailureCells = document.getElementsByClassName('system-failure');");
+            appendLine("	");
+            appendLine("	for (var i = 0; i < systemFailureCells.length; i ++) {");
+            appendLine("		systemFailureCells[i].style.display = value;");
+            appendLine("	}");
+            appendLine("}");
+            appendLine("</script>");
             appendLine("</head>");
             appendLine("<body>");
             appendLine("<table class=\"stats-table table-hover\">");
             appendLine("<thead>");
             appendLine("<tr class=\"header dont-sort\">");
-            appendLine("<th>Feature</th>");
+            appendLine("<th>Feature <button id=\"toggle-system-failures-button\" type=\"button\" class=\"btn btn-default\" onclick=\"toggleSystemFailures()\">Hide System Failures</button></th>");
             pairs.stream()
                 .sorted(comparing(pair -> pair.getRight().buildNumber))
                 .forEach(pair -> {
                     TestReport testReport = pair.getRight();
-                    append("<th>");
+                    append("<th");
+                    if (testReport.isSystemFailure()) {
+                        append(" class=\"system-failure\"");
+                    }
+                    append(">");
                     append("<a href=\"").append(jenkinsJob).append(testReport.buildNumber).append("/\">");
                     append(testReport.buildNumber);
                     append("</a>");
@@ -399,7 +452,7 @@ public class Main {
                 appendLine("<tr>");
                 append("<td class=\"tagname\">").append(aggregatedTestReportLine.feature).appendLine("</td>");
                 aggregatedTestReportLine
-                    .getTestReportLinesWithBuildNumber()
+                    .testReportLinesAndTestReport
                     .forEach(this::writeOneTestResult);
                 appendLine("</tr>");
             });
@@ -410,15 +463,19 @@ public class Main {
             return response.toString();
         }
 
-        private void writeOneTestResult(TestReportLineWithBuildNumber testReportLineWithBuildNumber) {
-            String buildNumber = testReportLineWithBuildNumber.buildNumber;
-            String featureLink = testReportLineWithBuildNumber.testReportLine.featureLink;
-            String status = testReportLineWithBuildNumber.testReportLine.status;
-            int failedAndSkippedSteps = testReportLineWithBuildNumber.testReportLine.getFailedAndSkippedStepsInt();
-            int totalSteps = testReportLineWithBuildNumber.testReportLine.getTotalStepsInt();
+        private void writeOneTestResult(Pair<TestReportLine, TestReport> testReportLineAndTestReport) {
+            String buildNumber = testReportLineAndTestReport.getRight().buildNumber;
+            boolean isSystemFailure = testReportLineAndTestReport.getRight().isSystemFailure();
+            String featureLink = testReportLineAndTestReport.getLeft().featureLink;
+            String status = testReportLineAndTestReport.getLeft().status;
+            int failedAndSkippedSteps = testReportLineAndTestReport.getLeft().getFailedAndSkippedStepsInt();
+            int totalSteps = testReportLineAndTestReport.getLeft().getTotalStepsInt();
 
             append("<td class=\"");
             append(status.toLowerCase());
+            if (isSystemFailure) {
+                append(" system-failure");
+            }
             append("\">");
             if (status.equals("Failed")) {
                 append("<a href=\"");
