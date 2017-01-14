@@ -48,13 +48,19 @@ public class Main {
     public static final String CUCUMBER_REPORTS_OVERVIEW_PAGE = CUCUMBER_REPORTS_PATH + "feature-overview.html";
 
     public static void main(String... args) throws Exception {
-        String jenkinsJob = args[0];
+        String host = args[0];
+        String jenkinsJob = args[1];
 
         RatpackServer.start(server -> server
             .serverConfig(c -> c.baseDir(BaseDir.find()).build())
             .handlers(chain -> chain
                     .files(files -> files.dir("static"))
-                    .get(context -> new JenkinsRequestProcessor(jenkinsJob, context, context.get(HttpClient.class)).process())
+                    .get(context -> new JenkinsRequestProcessor(host, jenkinsJob, context, context.get(HttpClient.class))
+                        .process()
+//                        .queryJenkinsBuildInformationIncludingUpstreamBuild("1494")
+//                        .map(build -> new BuildAndUpstreamBuild(build, Optional.empty()))
+//                    .then(buildAndUpstreamBuild -> context.render(buildAndUpstreamBuild.toString()))
+                        )
             )
         );
     }
@@ -105,6 +111,8 @@ public class Main {
         public Duration duration;
         public DateTime startedAt;
         public Optional<String> startedByUser;
+        public Optional<String> upstreamBuild;
+        public Optional<String> upstreamUrl;
 
         public String getDurationFormatted() {
             PeriodFormatter minutesAndSeconds = new PeriodFormatterBuilder()
@@ -124,6 +132,12 @@ public class Main {
         public String getStartedAtTimeFormatted() {
             return DateTimeFormat.forPattern("HH:mm").print(startedAt);
         }
+    }
+
+    @Value
+    static class BuildAndUpstreamBuild {
+        public Build build;
+        public Optional<Build> upstreamBuild;
     }
 
     @Value
@@ -190,16 +204,18 @@ public class Main {
     @Value
     @AllArgsConstructor
     static class JenkinsRequestProcessor {
+        String host;
         String jenkinsJob;
         Context context;
         AggregatedReportBuilder aggregatedReportBuilder;
         HttpClient httpClient;
 
-        public JenkinsRequestProcessor(String jenkinsJob, Context context, HttpClient httpClient) {
+        public JenkinsRequestProcessor(String host, String jenkinsJob, Context context, HttpClient httpClient) {
             this(
+                host,
                 jenkinsJob,
                 context,
-                new AggregatedReportBuilder(jenkinsJob),
+                new AggregatedReportBuilder(host, jenkinsJob),
                 httpClient
             );
         }
@@ -210,7 +226,7 @@ public class Main {
                     ParallelBatch.of(
                         builds.stream()
                             .map(build ->
-                                queryCucumberReport(build).left(queryJenkinsBuildInformation(build)))
+                                queryCucumberReport(build).left(queryJenkinsBuildInformationIncludingUpstreamBuild(build)))
                             .collect(toList())
                     )
                         .yield()
@@ -226,19 +242,31 @@ public class Main {
         }
 
         private Promise<List<String>> queryJenkinsJobPage() {
-            return httpClient.get(URI.create(jenkinsJob + JENKINS_API_SUFFIX))
+            return httpClient.get(URI.create(host + jenkinsJob + JENKINS_API_SUFFIX))
                 .map(this::getTextFromResponseBody)
                 .map(this::parseBuildNumbersFromJob);
         }
 
-        private Promise<Build> queryJenkinsBuildInformation(String build) {
-            return httpClient.get(URI.create(jenkinsJob + build + JENKINS_API_SUFFIX))
+        private Promise<BuildAndUpstreamBuild> queryJenkinsBuildInformationIncludingUpstreamBuild(String build) {
+            return queryJenkinsBuildInformation(jenkinsJob, build)
+                .flatMap(buildInfo -> {
+                    if (buildInfo.upstreamBuild.isPresent()) {
+                        return queryJenkinsBuildInformation(buildInfo.upstreamUrl.get(), buildInfo.upstreamBuild.get())
+                            .map(upstreamBuild -> new BuildAndUpstreamBuild(buildInfo, Optional.of(upstreamBuild)));
+                    } else {
+                        return Promise.value(new BuildAndUpstreamBuild(buildInfo, Optional.empty()));
+                    }
+                });
+        }
+
+        private Promise<Build> queryJenkinsBuildInformation(String jenkinsJob, String build) {
+            return httpClient.get(URI.create(host + jenkinsJob + build + JENKINS_API_SUFFIX))
                 .map(this::getTextFromResponseBody)
                 .map(text -> parseBuildInfo(text, build));
         }
 
         private Promise<TestReport> queryCucumberReport(String build) {
-            return httpClient.get(URI.create(jenkinsJob + build + CUCUMBER_REPORTS_OVERVIEW_PAGE))
+            return httpClient.get(URI.create(host + jenkinsJob + build + CUCUMBER_REPORTS_OVERVIEW_PAGE))
                 .map(this::getTextFromResponseBody)
                 .map(this::repairHtml)
                 .map(text -> parseTestReport(text, build));
@@ -284,7 +312,11 @@ public class Main {
             Optional<String> startedByUser = getSingleValue("//cause/userName", xPathFactory, document)
                 .map(name -> StringUtils.removeEnd(name, " (ext)"));
 
-            return new Build(build, duration, startedAt, startedByUser);
+            Optional<String> upstreamBuild = getSingleValue("//cause/upstreamBuild", xPathFactory, document);
+
+            Optional<String> upstreamUrl = getSingleValue("//cause/upstreamUrl", xPathFactory, document);
+
+            return new Build(build, duration, startedAt, startedByUser, upstreamBuild, upstreamUrl);
         }
 
         private Optional<String> getSingleValue(String query, XPathFactory xPathFactory, Document document) {
@@ -361,7 +393,7 @@ public class Main {
             }
         }
 
-        private void renderTestReports(List<? extends Pair<Build, TestReport>> pairs) {
+        private void renderTestReports(List<? extends Pair<BuildAndUpstreamBuild, TestReport>> pairs) {
             context.getResponse().status(Status.OK).contentType(MediaType.TEXT_HTML);
 
             List<TestReport> testReports = pairs.stream().map(Pair::getRight).collect(toList());
@@ -393,11 +425,12 @@ public class Main {
 
     @Value
     public static class AggregatedReportBuilder {
+        String host;
         String jenkinsJob;
         StringBuilder response = new StringBuilder();
 
         private String buildHtml(
-            List<? extends Pair<Build, TestReport>> pairs,
+            List<? extends Pair<BuildAndUpstreamBuild, TestReport>> pairs,
             List<AggregatedTestReportLine> aggregatedTestReportLines
         ) {
             appendLine("<!DOCTYPE html>");
@@ -441,16 +474,14 @@ public class Main {
                 .sorted(comparing(pair -> pair.getRight().buildNumber))
                 .forEach(pair -> {
                     TestReport testReport = pair.getRight();
-                    Build build = pair.getLeft();
+                    Build build = pair.getLeft().build;
+                    Optional<Build> optionalUpstreamBuild = pair.getLeft().upstreamBuild;
                     append("<th");
                     if (testReport.isSystemFailure()) {
                         append(" class=\"system-failure\"");
                     }
                     appendLine(">");
-                    append("<div data-toggle=\"tooltip\" data-placement=\"bottom\" title=\"");
-                    append(build.startedByUser.orElse("started by other job"));
-                    appendLine("\">");
-                    append("<a href=\"").append(jenkinsJob).append(testReport.buildNumber).append("/\">");
+                    append("<a href=\"").append(host).append(jenkinsJob).append(testReport.buildNumber).append("/\">");
                     append(testReport.buildNumber);
                     append("</a>");
                     append("<br/>");
@@ -459,7 +490,16 @@ public class Main {
                     append(build.getStartedAtDateFormatted());
                     append("<br/>");
                     appendLine(build.getStartedAtTimeFormatted());
-                    appendLine("</div>");
+                    optionalUpstreamBuild.ifPresent(upstreamBuild -> {
+                        append("<a href=\"").append(host).append(upstreamBuild.upstreamUrl.get()).append(upstreamBuild.upstreamBuild.get()).append("/\">");
+                        append(upstreamBuild.upstreamBuild.get());
+                        append("</a>");
+                    });
+                    build.startedByUser.ifPresent(startedByUser -> {
+                        append("<span data-toggle=\"tooltip\" data-placement=\"bottom\" title=\"");
+                        append(startedByUser);
+                        append("\">User<span>");
+                    });
                     appendLine("</th>");
                 });
             appendLine("</tr>");
@@ -501,7 +541,7 @@ public class Main {
             append("\">");
             if (status.equals("Failed")) {
                 append("<a href=\"");
-                append(jenkinsJob).append(buildNumber).append(CUCUMBER_REPORTS_PATH).append(featureLink);
+                append(host).append(jenkinsJob).append(buildNumber).append(CUCUMBER_REPORTS_PATH).append(featureLink);
                 append("\">");
                 append("<span class=\"text-danger\">");
                 append(failedAndSkippedSteps);
@@ -511,7 +551,7 @@ public class Main {
                 append("</a>");
             } else if (status.equals("Passed")) {
                 append("<a href=\"");
-                append(jenkinsJob).append(buildNumber).append(CUCUMBER_REPORTS_PATH).append(featureLink);
+                append(host).append(jenkinsJob).append(buildNumber).append(CUCUMBER_REPORTS_PATH).append(featureLink);
                 append("\">");
                 append("<span class=\"glyphicon glyphicon-ok text-success\" aria-hidden=\"true\"></span>");
                 append("</a>");

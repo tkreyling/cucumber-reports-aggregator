@@ -13,26 +13,30 @@ import org.junit.Test;
 import java.util.Optional;
 
 public class ParseBuildInformationTest {
-    JenkinsRequestProcessor jenkinsRequestProcessor = new JenkinsRequestProcessor(null, null, null);
+    JenkinsRequestProcessor jenkinsRequestProcessor = new JenkinsRequestProcessor(null, null, null, null);
 
     @Test
-    public void parseGivenStartedByUser() {
+    public void startedByUser() {
         Document startedByUser = readTestDocument("startedByUser.xml");
 
         Build build = jenkinsRequestProcessor.parseBuildInfo(startedByUser, "testrun");
 
         assertThat(build.buildNumber, is("testrun"));
         assertThat(build.startedByUser, is(Optional.of("Kreyling, Thomas")));
+        assertThat(build.upstreamBuild, is(Optional.empty()));
+        assertThat(build.upstreamUrl, is(Optional.empty()));
     }
 
     @Test
-    public void handleNotGivenStartedByUser() {
+    public void startedByJob() {
         Document startedByUser = readTestDocument("startedByJob.xml");
 
         Build build = jenkinsRequestProcessor.parseBuildInfo(startedByUser, "testrun");
 
         assertThat(build.buildNumber, is("testrun"));
         assertThat(build.startedByUser, is(Optional.empty()));
+        assertThat(build.upstreamBuild, is(Optional.of("1518")));
+        assertThat(build.upstreamUrl, is(Optional.of("job/some-other-project/")));
     }
 
     private Document readTestDocument(String filename) {
