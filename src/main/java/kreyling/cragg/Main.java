@@ -265,14 +265,13 @@ public class Main {
 
         private Promise<BuildAndUpstreamBuild> queryJenkinsBuildInformationIncludingUpstreamBuild(String build) {
             return queryJenkinsBuildInformation(jenkinsJob, build)
-                .flatMap(buildInfo -> {
-                    if (buildInfo.upstreamBuild.isPresent()) {
-                        return queryJenkinsBuildInformation(buildInfo.upstreamBuild.get().upstreamUrl, buildInfo.upstreamBuild.get().getNumber())
-                            .map(upstreamBuild -> new BuildAndUpstreamBuild(buildInfo, Optional.of(upstreamBuild)));
-                    } else {
-                        return Promise.value(new BuildAndUpstreamBuild(buildInfo, Optional.empty()));
-                    }
-                });
+                .flatMap(buildInfo -> buildInfo.upstreamBuild
+                    .map(buildReference -> queryJenkinsBuildInformation(buildReference.upstreamUrl, buildReference.number)
+                        .map(Optional::of)
+                    )
+                    .orElse(Promise.value(Optional.empty()))
+                    .map(optionalUpstreamBuild -> new BuildAndUpstreamBuild(buildInfo, optionalUpstreamBuild))
+                );
         }
 
         private Promise<Build> queryJenkinsBuildInformation(String jenkinsJob, String build) {
