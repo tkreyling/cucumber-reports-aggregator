@@ -537,17 +537,9 @@ public class Main {
                         append(upstreamBuild.upstreamBuild.get().number);
                         append("</a>");
                     });
-                    build.startedByUser.ifPresent(startedByUser -> {
-                        append("<span data-toggle=\"tooltip\" data-placement=\"bottom\" title=\"");
-                        append(startedByUser);
-                        append("\">User<span>");
-                    });
+                    build.startedByUser.ifPresent(startedByUser -> appendPopover("User", startedByUser));
                     if (!build.scmChanges.isEmpty()) {
-                        append("<span data-toggle=\"tooltip\" data-html=\"true\" data-placement=\"bottom\" title=\"");
-                        append(build.scmChanges.stream()
-                            .map(scmChange -> scmChange.user + "<br/>" + scmChange.getFirstLineOfComment())
-                            .collect(joining("<br/>")));
-                        append("\">E2E<span>");
+                        appendPopover("E2E", scmChangesHtml(build));
                     }
                     appendLine("</th>");
                 });
@@ -565,13 +557,31 @@ public class Main {
             appendLine("</table>");
             appendLine("<script>");
             appendLine("$(function () {");
-            appendLine("  $('[data-toggle=\"tooltip\"]').tooltip()");
+            appendLine("  $('[data-toggle=\"popover\"]').popover()");
             appendLine("})");
             appendLine("</script>");
             appendLine("</body>");
             appendLine("</html>");
 
             return response.toString();
+        }
+
+        private String scmChangesHtml(Build build) {
+            return build.scmChanges.stream()
+                .map(scmChange -> scmChange.user + "<br/>" + scmChange.getFirstLineOfComment())
+                .collect(joining("<br/>"));
+        }
+
+        private void appendPopover(String title, String content) {
+            append("<a ");
+            append("tabindex=\"0\" ");
+            append("role=\"button\" ");
+            append("data-toggle=\"popover\" ");
+            append("data-html=\"true\" ");
+            append("data-placement=\"left\" ");
+            append("data-content=\"").append(content).append("\">");
+            append(title);
+            append("</a>");
         }
 
         private void writeOneTestResult(Pair<TestReportLine, TestReport> testReportLineAndTestReport) {
