@@ -196,7 +196,7 @@ public class Main {
 
             double directlySuccessionalFailures = countDirectlySuccessionalFailures(sortedStatus);
 
-            return directlySuccessionalFailures / numberOfFeatures  > 0.4;
+            return directlySuccessionalFailures / numberOfFeatures  > 0.15;
         }
 
         static int countDirectlySuccessionalFailures(List<String> sortedStatus) {
