@@ -529,6 +529,7 @@ public class Main {
                     append(build.getStartedAtDateFormatted());
                     append("<br/>");
                     appendLine(build.getStartedAtTimeFormatted());
+                    append("<br/>");
                     optionalUpstreamBuild.ifPresent(upstreamBuild -> {
                         append("<a href=\"").append(host)
                             .append(upstreamBuild.upstreamBuild.get().upstreamUrl)
@@ -560,6 +561,10 @@ public class Main {
             appendLine("  $('[data-toggle=\"popover\"]').popover()");
             appendLine("})");
             appendLine("</script>");
+//            appendLine("<table class='table table-condensed'>");
+//            appendLine("<tr><td>Test Text</td><td>Viel längerer Testtext</td></tr>");
+//            appendLine("<tr><td>Test Text</td><td>Viel längerer Testtext</td></tr>");
+//            appendLine("</table>");
             appendLine("</body>");
             appendLine("</html>");
 
@@ -567,9 +572,11 @@ public class Main {
         }
 
         private String scmChangesHtml(Build build) {
-            return build.scmChanges.stream()
-                .map(scmChange -> scmChange.user + "<br/>" + scmChange.getFirstLineOfComment())
-                .collect(joining("<br/>"));
+            return "<table class='table table-condensed'>" +
+                build.scmChanges.stream()
+                    .map(scmChange -> "<tr><td>" + scmChange.user + "</td><td>" + scmChange.comment + "</td>")
+                    .collect(joining("\n")) +
+                "</table>";
         }
 
         private void appendPopover(String title, String content) {
