@@ -7,6 +7,7 @@ import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.left;
 
 import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.experimental.NonFinal;
 import ratpack.exec.Promise;
@@ -65,10 +66,21 @@ public class Main {
         );
     }
 
+    @Value
+    @EqualsAndHashCode(of = "name")
+    private static class Feature implements Comparable<Feature> {
+        String name;
+        String link;
+
+        @Override
+        public int compareTo(Feature otherFeature) {
+            return name.compareTo(otherFeature.name);
+        }
+    }
+
     @Value @NonFinal
     private static class TestReportLine {
-        String feature;
-        String featureLink;
+        Feature feature;
         String failedSteps;
         String skippedSteps;
         String totalSteps;
@@ -100,8 +112,8 @@ public class Main {
     }
 
     private static class NullTestReportLine extends TestReportLine{
-        public NullTestReportLine(String feature) {
-            super(feature, "", "", "", "", "");
+        public NullTestReportLine(Feature feature) {
+            super(feature, "", "", "", "");
         }
     }
 
@@ -144,10 +156,6 @@ public class Main {
     static class ScmChange {
         public String user;
         public String comment;
-
-        public String getFirstLineOfComment() {
-            return StringUtils.split(comment, "\n")[0];
-        }
     }
 
     @Value
@@ -160,7 +168,7 @@ public class Main {
     static class TestReport {
         String buildNumber;
         List<TestReportLine> testReportLines;
-        Map<String, List<TestReportLine>> testReportLinesByFeature;
+        Map<Feature, List<TestReportLine>> testReportLinesByFeature;
 
         public TestReport(String buildNumber, List<TestReportLine> testReportLines) {
             this.buildNumber = buildNumber;
@@ -168,11 +176,11 @@ public class Main {
             testReportLinesByFeature = testReportLines.stream().collect(groupingBy(TestReportLine::getFeature));
         }
 
-        public Stream<String> getAllFeatures() {
+        public Stream<Feature> getAllFeatures() {
             return testReportLinesByFeature.keySet().stream();
         }
 
-        public TestReportLine getTestReportLineByFeature(String feature) {
+        public TestReportLine getTestReportLineByFeature(Feature feature) {
             if (!testReportLinesByFeature.containsKey(feature)) return new NullTestReportLine(feature);
 
             return testReportLinesByFeature.get(feature).get(0);
@@ -213,7 +221,7 @@ public class Main {
 
     @Value
     private static class AggregatedTestReportLine {
-        String feature;
+        Feature feature;
         List<Pair<TestReportLine, TestReport>> testReportLinesAndTestReport;
     }
 
@@ -414,8 +422,10 @@ public class Main {
 
         private TestReportLine mapHtmlRowToTestReportLine(Element element) {
             return new TestReportLine(
-                element.getChildren().get(0).getChildren().get(0).getText(),
-                element.getChildren().get(0).getChildren().get(0).getAttributeValue("href"),
+                new Feature(
+                    element.getChildren().get(0).getChildren().get(0).getText(),
+                    element.getChildren().get(0).getChildren().get(0).getAttributeValue("href")
+                ),
                 element.getChildren().get(6).getText(),
                 element.getChildren().get(7).getText(),
                 element.getChildren().get(4).getText(),
@@ -448,7 +458,7 @@ public class Main {
 
         private AggregatedTestReportLine createAggregatedTestReportLine(
             List<? extends TestReport> testReports,
-            String feature
+            Feature feature
         ) {
             List<Pair<TestReportLine, TestReport>> allTestReportLinesForThisFeature = testReports.stream()
                 .map(testReport -> Pair.of(
@@ -549,7 +559,7 @@ public class Main {
 
             aggregatedTestReportLines.forEach(aggregatedTestReportLine -> {
                 appendLine("<tr>");
-                append("<td class=\"tagname\">").append(aggregatedTestReportLine.feature).appendLine("</td>");
+                append("<td class=\"tagname\">").append(aggregatedTestReportLine.feature.name).appendLine("</td>");
                 aggregatedTestReportLine
                     .testReportLinesAndTestReport
                     .forEach(this::writeOneTestResult);
@@ -594,7 +604,7 @@ public class Main {
         private void writeOneTestResult(Pair<TestReportLine, TestReport> testReportLineAndTestReport) {
             String buildNumber = testReportLineAndTestReport.getRight().buildNumber;
             boolean isSystemFailure = testReportLineAndTestReport.getRight().isSystemFailure();
-            String featureLink = testReportLineAndTestReport.getLeft().featureLink;
+            String featureLink = testReportLineAndTestReport.getLeft().feature.link;
             String status = testReportLineAndTestReport.getLeft().status;
             int failedAndSkippedSteps = testReportLineAndTestReport.getLeft().getFailedAndSkippedStepsInt();
             int totalSteps = testReportLineAndTestReport.getLeft().getTotalStepsInt();
