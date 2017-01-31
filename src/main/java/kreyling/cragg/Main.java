@@ -568,13 +568,16 @@ public class Main {
                 append("<br/>");
                 appendLine(build.getStartedAtTimeFormatted());
                 append("<br/>");
-                optionalUpstreamBuild
-                    .flatMap(Build::getUpstreamBuild)
-                    .ifPresent(upstreamBuild -> writeBuildLink(upstreamBuild.upstreamUrl, upstreamBuild.number));
                 build.startedByUser.ifPresent(startedByUser -> appendPopover("User", startedByUser));
                 if (!build.scmChanges.isEmpty()) {
                     appendPopover("E2E", scmChangesHtml(build));
                 }
+                optionalUpstreamBuild
+                    .flatMap(Build::getUpstreamBuild)
+                    .ifPresent(upstreamBuild -> writeBuildLink(upstreamBuild.upstreamUrl, upstreamBuild.number));
+                optionalUpstreamBuild
+                    .flatMap(Build::getStartedByUser)
+                    .ifPresent(startedByUser -> appendPopover("User", startedByUser));
 
                 appendLine("</th>");
             } catch (Exception e) {
