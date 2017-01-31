@@ -129,6 +129,9 @@ public class Main {
         public String getDurationFormatted() {
             PeriodFormatter minutesAndSeconds = new PeriodFormatterBuilder()
                 .printZeroAlways()
+                .appendHours()
+                .appendSeparator(":")
+                .minimumPrintedDigits(2)
                 .appendMinutes()
                 .appendSeparator(":")
                 .minimumPrintedDigits(2)
