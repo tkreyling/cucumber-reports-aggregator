@@ -570,14 +570,16 @@ public class Main {
                 append("<br/>");
                 appendLine(build.getStartedAtTimeFormatted());
                 append("<br/>");
-                optionalUpstreamBuild.ifPresent(upstreamBuild -> {
-                    append("<a href=\"").append(host)
-                        .append(upstreamBuild.upstreamBuild.get().upstreamUrl)
-                        .append(upstreamBuild.upstreamBuild.get().number)
-                        .append("/\">");
-                    append(upstreamBuild.upstreamBuild.get().number);
-                    append("</a>");
-                });
+                optionalUpstreamBuild
+                    .flatMap(Build::getUpstreamBuild)
+                    .ifPresent(upstreamBuild -> {
+                        append("<a href=\"").append(host)
+                            .append(upstreamBuild.upstreamUrl)
+                            .append(upstreamBuild.number)
+                            .append("/\">");
+                        append(upstreamBuild.number);
+                        append("</a>");
+                    });
                 build.startedByUser.ifPresent(startedByUser -> appendPopover("User", startedByUser));
                 if (!build.scmChanges.isEmpty()) {
                     appendPopover("E2E", scmChangesHtml(build));
