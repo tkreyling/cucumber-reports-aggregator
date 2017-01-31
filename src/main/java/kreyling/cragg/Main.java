@@ -552,35 +552,40 @@ public class Main {
         private void writeOneColumnHeader(Pair<BuildAndUpstreamBuild, TestReport> pair) {
             TestReport testReport = pair.getRight();
             Build build = pair.getLeft().build;
-            Optional<Build> optionalUpstreamBuild = pair.getLeft().upstreamBuild;
-            append("<th");
-            if (testReport.isSystemFailure()) {
-                append(" class=\"system-failure\"");
-            }
-            appendLine(">");
-            append("<a href=\"").append(host).append(jenkinsJob).append(testReport.buildNumber).append("/\">");
-            append(testReport.buildNumber);
-            append("</a>");
-            append("<br/>");
-            append(build.getDurationFormatted());
-            append("<br/>");
-            append(build.getStartedAtDateFormatted());
-            append("<br/>");
-            appendLine(build.getStartedAtTimeFormatted());
-            append("<br/>");
-            optionalUpstreamBuild.ifPresent(upstreamBuild -> {
-                append("<a href=\"").append(host)
-                    .append(upstreamBuild.upstreamBuild.get().upstreamUrl)
-                    .append(upstreamBuild.upstreamBuild.get().number)
-                    .append("/\">");
-                append(upstreamBuild.upstreamBuild.get().number);
+
+            try {
+                Optional<Build> optionalUpstreamBuild = pair.getLeft().upstreamBuild;
+                append("<th");
+                if (testReport.isSystemFailure()) {
+                    append(" class=\"system-failure\"");
+                }
+                appendLine(">");
+                append("<a href=\"").append(host).append(jenkinsJob).append(testReport.buildNumber).append("/\">");
+                append(testReport.buildNumber);
                 append("</a>");
-            });
-            build.startedByUser.ifPresent(startedByUser -> appendPopover("User", startedByUser));
-            if (!build.scmChanges.isEmpty()) {
-                appendPopover("E2E", scmChangesHtml(build));
+                append("<br/>");
+                append(build.getDurationFormatted());
+                append("<br/>");
+                append(build.getStartedAtDateFormatted());
+                append("<br/>");
+                appendLine(build.getStartedAtTimeFormatted());
+                append("<br/>");
+                optionalUpstreamBuild.ifPresent(upstreamBuild -> {
+                    append("<a href=\"").append(host)
+                        .append(upstreamBuild.upstreamBuild.get().upstreamUrl)
+                        .append(upstreamBuild.upstreamBuild.get().number)
+                        .append("/\">");
+                    append(upstreamBuild.upstreamBuild.get().number);
+                    append("</a>");
+                });
+                build.startedByUser.ifPresent(startedByUser -> appendPopover("User", startedByUser));
+                if (!build.scmChanges.isEmpty()) {
+                    appendPopover("E2E", scmChangesHtml(build));
+                }
+                appendLine("</th>");
+            } catch (Exception e) {
+                throw new RuntimeException("Exception while writing header cell for build " + build.buildNumber, e);
             }
-            appendLine("</th>");
         }
 
         private String scmChangesHtml(Build build) {
