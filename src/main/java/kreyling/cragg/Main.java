@@ -521,39 +521,7 @@ public class Main {
                 "<th>Feature <button id=\"toggle-system-failures-button\" type=\"button\" class=\"btn btn-default\" onclick=\"toggleSystemFailures()\">Hide System Failures</button></th>");
             pairs.stream()
                 .sorted(comparing(pair -> pair.getRight().buildNumber))
-                .forEach(pair -> {
-                    TestReport testReport = pair.getRight();
-                    Build build = pair.getLeft().build;
-                    Optional<Build> optionalUpstreamBuild = pair.getLeft().upstreamBuild;
-                    append("<th");
-                    if (testReport.isSystemFailure()) {
-                        append(" class=\"system-failure\"");
-                    }
-                    appendLine(">");
-                    append("<a href=\"").append(host).append(jenkinsJob).append(testReport.buildNumber).append("/\">");
-                    append(testReport.buildNumber);
-                    append("</a>");
-                    append("<br/>");
-                    append(build.getDurationFormatted());
-                    append("<br/>");
-                    append(build.getStartedAtDateFormatted());
-                    append("<br/>");
-                    appendLine(build.getStartedAtTimeFormatted());
-                    append("<br/>");
-                    optionalUpstreamBuild.ifPresent(upstreamBuild -> {
-                        append("<a href=\"").append(host)
-                            .append(upstreamBuild.upstreamBuild.get().upstreamUrl)
-                            .append(upstreamBuild.upstreamBuild.get().number)
-                            .append("/\">");
-                        append(upstreamBuild.upstreamBuild.get().number);
-                        append("</a>");
-                    });
-                    build.startedByUser.ifPresent(startedByUser -> appendPopover("User", startedByUser));
-                    if (!build.scmChanges.isEmpty()) {
-                        appendPopover("E2E", scmChangesHtml(build));
-                    }
-                    appendLine("</th>");
-                });
+                .forEach(this::writeOneColumnHeader);
             appendLine("</tr>");
             appendLine("</thead>");
 
@@ -579,6 +547,40 @@ public class Main {
             appendLine("</html>");
 
             return response.toString();
+        }
+
+        private void writeOneColumnHeader(Pair<BuildAndUpstreamBuild, TestReport> pair) {
+            TestReport testReport = pair.getRight();
+            Build build = pair.getLeft().build;
+            Optional<Build> optionalUpstreamBuild = pair.getLeft().upstreamBuild;
+            append("<th");
+            if (testReport.isSystemFailure()) {
+                append(" class=\"system-failure\"");
+            }
+            appendLine(">");
+            append("<a href=\"").append(host).append(jenkinsJob).append(testReport.buildNumber).append("/\">");
+            append(testReport.buildNumber);
+            append("</a>");
+            append("<br/>");
+            append(build.getDurationFormatted());
+            append("<br/>");
+            append(build.getStartedAtDateFormatted());
+            append("<br/>");
+            appendLine(build.getStartedAtTimeFormatted());
+            append("<br/>");
+            optionalUpstreamBuild.ifPresent(upstreamBuild -> {
+                append("<a href=\"").append(host)
+                    .append(upstreamBuild.upstreamBuild.get().upstreamUrl)
+                    .append(upstreamBuild.upstreamBuild.get().number)
+                    .append("/\">");
+                append(upstreamBuild.upstreamBuild.get().number);
+                append("</a>");
+            });
+            build.startedByUser.ifPresent(startedByUser -> appendPopover("User", startedByUser));
+            if (!build.scmChanges.isEmpty()) {
+                appendPopover("E2E", scmChangesHtml(build));
+            }
+            appendLine("</th>");
         }
 
         private String scmChangesHtml(Build build) {
