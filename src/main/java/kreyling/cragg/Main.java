@@ -560,9 +560,7 @@ public class Main {
                     append(" class=\"system-failure\"");
                 }
                 appendLine(">");
-                append("<a href=\"").append(host).append(jenkinsJob).append(testReport.buildNumber).append("/\">");
-                append(testReport.buildNumber);
-                append("</a>");
+                writeBuildLink(jenkinsJob, testReport.buildNumber);
                 append("<br/>");
                 append(build.getDurationFormatted());
                 append("<br/>");
@@ -572,22 +570,22 @@ public class Main {
                 append("<br/>");
                 optionalUpstreamBuild
                     .flatMap(Build::getUpstreamBuild)
-                    .ifPresent(upstreamBuild -> {
-                        append("<a href=\"").append(host)
-                            .append(upstreamBuild.upstreamUrl)
-                            .append(upstreamBuild.number)
-                            .append("/\">");
-                        append(upstreamBuild.number);
-                        append("</a>");
-                    });
+                    .ifPresent(upstreamBuild -> writeBuildLink(upstreamBuild.upstreamUrl, upstreamBuild.number));
                 build.startedByUser.ifPresent(startedByUser -> appendPopover("User", startedByUser));
                 if (!build.scmChanges.isEmpty()) {
                     appendPopover("E2E", scmChangesHtml(build));
                 }
+
                 appendLine("</th>");
             } catch (Exception e) {
                 throw new RuntimeException("Exception while writing header cell for build " + build.buildNumber, e);
             }
+        }
+
+        private void writeBuildLink(String jobUrl, String buildNumber) {
+            append("<a href=\"").append(host).append(jobUrl).append(buildNumber).append("/\">");
+            append(buildNumber);
+            append("</a>");
         }
 
         private String scmChangesHtml(Build build) {
