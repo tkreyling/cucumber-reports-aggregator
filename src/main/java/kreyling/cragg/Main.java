@@ -392,10 +392,10 @@ public class Main {
         }
 
         private TestReport parseTestReport(String text, String build) {
-            Document document = readDocument(text);
-            XPathFactory xPathFactory = XPathFactory.instance();
-
             try {
+                Document document = readDocument(text);
+                XPathFactory xPathFactory = XPathFactory.instance();
+
                 if (text.contains("Not found")) return null;
                 if (text.contains("You have no features in your cucumber report")) return null;
 
