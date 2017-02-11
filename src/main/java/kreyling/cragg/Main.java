@@ -597,9 +597,22 @@ public class Main {
         private String scmChangesHtml(Build build) {
             return "<table class='table table-condensed'>" +
                 build.scmChanges.stream()
-                    .map(scmChange -> "<tr><td>" + scmChange.user + "</td><td>" + scmChange.comment + "</td>")
+                    .map(scmChange -> "<tr><td class=&quot;text-left&quot;>" + scmChange.user + "</td>" +
+                        "<td><p class=&quot;text-left&quot;>" + formatTextAsQuotedHtml(scmChange.comment) + "</p></td></tr>")
                     .collect(joining("\n")) +
                 "</table>";
+        }
+
+        private String formatTextAsQuotedHtml(String text) {
+            // Replace first line break, as this is the heading of the commit comment
+            text = StringUtils.replace(text, "\n", "<br/>", 1);
+
+            text = StringUtils.replace(text, "\"", "&quot;");
+
+            // Replace line breaks followed by a * as sign of a list item
+            text = StringUtils.replace(text, "\n*", "<br/>*");
+
+            return text;
         }
 
         private void appendPopover(String title, String content) {
