@@ -123,7 +123,7 @@ public class Main {
         public Duration duration;
         public DateTime startedAt;
         public Optional<String> startedByUser;
-        public Optional<BuildReference> upstreamBuild;
+        public List<BuildReference> upstreamBuilds;
         public List<ScmChange> scmChanges;
 
         public String getDurationFormatted() {
@@ -276,7 +276,7 @@ public class Main {
 
         private Promise<BuildAndUpstreamBuild> queryJenkinsBuildInformationIncludingUpstreamBuild(String build) {
             return queryJenkinsBuildInformation(jenkinsJob, build)
-                .flatMap(buildInfo -> buildInfo.upstreamBuild
+                .flatMap(buildInfo -> buildInfo.upstreamBuilds.stream().findFirst()
                     .map(buildReference -> queryJenkinsBuildInformation(buildReference.upstreamUrl, buildReference.number)
                         .map(Optional::of)
                     )
@@ -338,19 +338,22 @@ public class Main {
             Optional<String> startedByUser = getSingleValue("//cause/userName", xPathFactory, document)
                 .map(this::removeExtSuffix);
 
-            Optional<BuildReference> upstreamBuild = parseUpstreamBuild(xPathFactory, document);
+            List<BuildReference> upstreamBuilds = parseUpstreamBuilds(xPathFactory, document);
 
             List<ScmChange> scmChanges = parseScmChanges(xPathFactory, document);
 
-            return new Build(build, duration, startedAt, startedByUser, upstreamBuild, scmChanges);
+            return new Build(build, duration, startedAt, startedByUser, upstreamBuilds, scmChanges);
         }
 
-        private Optional<BuildReference> parseUpstreamBuild(XPathFactory xPathFactory, Document document) {
-            return getSingleValue("//cause/upstreamBuild", xPathFactory, document)
-                .map(number -> new BuildReference(
-                    number,
-                    getSingleValue("//cause/upstreamUrl", xPathFactory, document).get()
-                ));
+        private List<BuildReference> parseUpstreamBuilds(XPathFactory xPathFactory, Document document) {
+            XPathExpression<Element> upstreamBuildsXPath = xPathFactory.compile("//cause[@_class=\"hudson.model.Cause$UpstreamCause\"]", Filters.element());
+
+            return upstreamBuildsXPath.evaluate(document).stream()
+                .map(element -> new BuildReference(
+                    element.getChildText("upstreamBuild"),
+                    element.getChildText("upstreamUrl")
+                ))
+                .collect(toList());
         }
 
         private List<ScmChange> parseScmChanges(XPathFactory xPathFactory, Document document) {
@@ -576,7 +579,7 @@ public class Main {
                     appendPopover("E2E", scmChangesHtml(build));
                 }
                 optionalUpstreamBuild
-                    .flatMap(Build::getUpstreamBuild)
+                    .flatMap(upstreamBuild -> upstreamBuild.upstreamBuilds.stream().findFirst())
                     .ifPresent(upstreamBuild -> writeBuildLink(upstreamBuild.upstreamUrl, upstreamBuild.number));
                 optionalUpstreamBuild
                     .flatMap(Build::getStartedByUser)

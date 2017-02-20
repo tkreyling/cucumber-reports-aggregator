@@ -1,0 +1,36 @@
+<multiJobBuild _class="com.tikal.jenkins.plugins.multijob.MultiJobBuild">
+    <action _class="hudson.model.CauseAction">
+        <cause _class="hudson.model.Cause$UpstreamCause">
+            <shortDescription>Gestartet durch vorgelagertes Projekt "other-project-1", Build 13</shortDescription>
+            <upstreamBuild>13</upstreamBuild>
+            <upstreamProject>other-project-1</upstreamProject>
+            <upstreamUrl>job/other-project-1/</upstreamUrl>
+        </cause>
+        <cause _class="hudson.model.Cause$UpstreamCause">
+            <shortDescription>Gestartet durch vorgelagertes Projekt "other-project-2", Build 985</shortDescription>
+            <upstreamBuild>985</upstreamBuild>
+            <upstreamProject>other-project-2</upstreamProject>
+            <upstreamUrl>job/other-project-2/</upstreamUrl>
+        </cause>
+    </action>
+    <action/>
+    <action/>
+    <action/>
+    <action/>
+    <action/>
+    <action/>
+    <action/>
+    <action/>
+    <building>false</building>
+    <displayName>#1829</displayName>
+    <duration>3989356</duration>
+    <estimatedDuration>385404</estimatedDuration>
+    <id>1829</id>
+    <keepLog>false</keepLog>
+    <number>1829</number>
+    <queueId>9649</queueId>
+    <result>FAILURE</result>
+    <timestamp>1487585495236</timestamp>
+    <builtOn/>
+    <changeSet _class="hudson.scm.EmptyChangeLogSet"/>
+</multiJobBuild>
