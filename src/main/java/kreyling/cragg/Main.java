@@ -245,7 +245,6 @@ public class Main {
     static class JenkinsRequestProcessor {
         String host;
         String jenkinsJob;
-        Optional<String> scmRepositoryBaseUrl;
         Context context;
         AggregatedReportBuilder aggregatedReportBuilder;
         HttpClient httpClient;
@@ -255,9 +254,8 @@ public class Main {
             this(
                 host,
                 jenkinsJob,
-                scmRepositoryBaseUrl,
                 context,
-                new AggregatedReportBuilder(host, jenkinsJob),
+                new AggregatedReportBuilder(host, jenkinsJob, scmRepositoryBaseUrl),
                 httpClient
             );
         }
@@ -513,6 +511,7 @@ public class Main {
     public static class AggregatedReportBuilder {
         String host;
         String jenkinsJob;
+        Optional<String> scmRepositoryBaseUrl;
         StringBuilder response = new StringBuilder();
 
         private String buildHtml(
@@ -642,11 +641,19 @@ public class Main {
             return "<table class='table table-condensed'>" +
                 build.scmChanges.stream()
                     .map(scmChange -> "<tr>" +
+                        scmCommitLink(scmChange, build) +
                         "<td>" + scmChange.user + "</td>" +
                         "<td><p class=&quot;text-left&quot;>" + formatTextAsQuotedHtml(scmChange.comment) + "</p></td>" +
                         "</tr>")
                     .collect(joining("\n")) +
                 "</table>";
+        }
+
+        private String scmCommitLink(ScmChange scmChange, Build build) {
+            return scmRepositoryBaseUrl
+                .map(url -> "<td><a href='" + url + StringUtils.removeStart(build.buildReference.jobPath, "job/") +
+                    "commits/" + scmChange.commitId + "'>SCM</a></td>")
+                .orElse("");
         }
 
         private String upstreamBuildsHtml(Build build) {
