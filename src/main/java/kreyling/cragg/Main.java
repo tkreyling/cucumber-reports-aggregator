@@ -251,7 +251,7 @@ public class Main {
                     ParallelBatch.of(
                         buildReferences.stream()
                             .map(buildReference ->
-                                queryCucumberReport(buildReference.number)
+                                queryCucumberReport(buildReference)
                                     .left(queryJenkinsBuildInformationIncludingUpstreamBuild(buildReference.number)))
                             .collect(toList())
                     )
@@ -293,11 +293,11 @@ public class Main {
                 .map(text -> parseBuildInfo(text, build));
         }
 
-        private Promise<TestReport> queryCucumberReport(String build) {
-            return httpClient.get(URI.create(host + jenkinsJob + build + CUCUMBER_REPORTS_OVERVIEW_PAGE))
+        private Promise<TestReport> queryCucumberReport(BuildReference buildReference) {
+            return httpClient.get(URI.create(host + buildReference.upstreamUrl + buildReference.number + CUCUMBER_REPORTS_OVERVIEW_PAGE))
                 .map(this::getTextFromResponseBody)
                 .map(this::repairHtml)
-                .map(text -> parseTestReport(text, build));
+                .map(text -> parseTestReport(text, buildReference.number));
         }
 
         private String getTextFromResponseBody(ReceivedResponse receivedResponse) {
