@@ -1,6 +1,8 @@
 package kreyling.cragg;
 
+import static java.util.Collections.emptyList;
 import static java.util.Comparator.comparing;
+import static java.util.Optional.empty;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
@@ -37,7 +39,6 @@ import org.joda.time.format.PeriodFormatterBuilder;
 
 import java.io.StringReader;
 import java.net.URI;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -120,7 +121,7 @@ public class Main {
         }
     }
 
-    @Value
+    @Value @NonFinal
     static class Build {
         public BuildReference buildReference;
         public Duration duration;
@@ -150,6 +151,12 @@ public class Main {
 
         public String getStartedAtTimeFormatted() {
             return DateTimeFormat.forPattern("HH:mm").print(startedAt);
+        }
+    }
+
+    static class NullBuild extends Build {
+        public NullBuild(BuildReference buildReference) {
+            super(buildReference, null, null, empty(), emptyList(), emptyList(), emptyList());
         }
     }
 
@@ -286,21 +293,13 @@ public class Main {
                                             .collect(toList())
                                     )
                                         .yield()
-                                        .map(this::filterNotFoundBuilds)
                                         .map(buildInfoLevel1::withUpstreamBuilds)
                                 ))
                             .collect(toList())
                     )
                         .yield()
-                        .map(this::filterNotFoundBuilds)
                         .map(buildInfoLevel0::withUpstreamBuilds)
                 );
-        }
-
-        private <T extends Build> List<T> filterNotFoundBuilds(List<T> builds) {
-            return builds.stream()
-                .filter(build -> build != null)
-                .collect(toList());
         }
 
         private Promise<Build> queryJenkinsBuildInformation(BuildReference buildReference) {
@@ -339,7 +338,7 @@ public class Main {
 
         private Build parseBuildInfo(String text, BuildReference buildReference) {
             try {
-                if (text.contains("Not Found")) return null;
+                if (text.contains("Not Found")) return new NullBuild(buildReference);
 
                 return parseBuildInfo(readDocument(text), buildReference);
 
@@ -364,7 +363,7 @@ public class Main {
 
             List<ScmChange> scmChanges = parseScmChanges(xPathFactory, document);
 
-            return new Build(buildReference, duration, startedAt, startedByUser, upstreamBuilds, Collections.emptyList(), scmChanges);
+            return new Build(buildReference, duration, startedAt, startedByUser, upstreamBuilds, emptyList(), scmChanges);
         }
 
         private List<BuildReference> parseUpstreamBuilds(XPathFactory xPathFactory, Document document) {
@@ -396,7 +395,7 @@ public class Main {
         private Optional<String> getSingleValue(String query, XPathFactory xPathFactory, Document document) {
             XPathExpression<Element> xPathExpression = xPathFactory.compile(query, Filters.element());
             List<Element> elements = xPathExpression.evaluate(document);
-            if (elements.isEmpty()) return Optional.empty();
+            if (elements.isEmpty()) return empty();
             return Optional.of(elements.get(0).getText());
         }
 
