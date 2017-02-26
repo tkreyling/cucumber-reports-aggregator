@@ -37,9 +37,11 @@ import org.joda.time.format.PeriodFormatterBuilder;
 
 import java.io.StringReader;
 import java.net.URI;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 public class Main {
@@ -125,7 +127,7 @@ public class Main {
         public DateTime startedAt;
         public Optional<String> startedByUser;
         public List<BuildReference> upstreamBuildReferences;
-        @Wither public Optional<Build> firstUpstreamBuild;
+        @Wither public List<? extends Build> upstreamBuilds;
         public List<ScmChange> scmChanges;
 
         public String getDurationFormatted() {
@@ -272,12 +274,15 @@ public class Main {
 
         private Promise<Build> queryJenkinsBuildInformationIncludingUpstreamBuild(String build) {
             return queryJenkinsBuildInformation(jenkinsJob, build)
-                .flatMap(buildInfo -> buildInfo.upstreamBuildReferences.stream().findFirst()
-                    .map(buildReference -> queryJenkinsBuildInformation(buildReference.upstreamUrl, buildReference.number)
-                        .map(Optional::of)
+                .flatMap(buildInfo ->
+                    ParallelBatch.of(
+                        buildInfo.upstreamBuildReferences.stream()
+                            .map(buildReference ->
+                                queryJenkinsBuildInformation(buildReference.upstreamUrl, buildReference.number))
+                            .collect(toList())
                     )
-                    .orElse(Promise.value(Optional.empty()))
-                    .map(buildInfo::withFirstUpstreamBuild)
+                        .yield()
+                        .map(buildInfo::withUpstreamBuilds)
                 );
         }
 
@@ -338,7 +343,7 @@ public class Main {
 
             List<ScmChange> scmChanges = parseScmChanges(xPathFactory, document);
 
-            return new Build(build, duration, startedAt, startedByUser, upstreamBuilds, Optional.empty(), scmChanges);
+            return new Build(build, duration, startedAt, startedByUser, upstreamBuilds, Collections.emptyList(), scmChanges);
         }
 
         private List<BuildReference> parseUpstreamBuilds(XPathFactory xPathFactory, Document document) {
@@ -556,13 +561,13 @@ public class Main {
             Build build = pair.getLeft();
 
             try {
-                append("<th");
+                append("<th style=\"vertical-align: top;\"");
                 if (testReport.isSystemFailure()) {
                     append(" class=\"system-failure\"");
                 }
                 appendLine(">");
                 writeBuildLink(jenkinsJob, testReport.buildNumber);
-                append("<br/>");
+
                 append(build.getDurationFormatted());
                 append("<br/>");
                 append(build.getStartedAtDateFormatted());
@@ -572,13 +577,15 @@ public class Main {
                 build.startedByUser.ifPresent(startedByUser -> appendPopover("User", startedByUser));
                 if (!build.scmChanges.isEmpty()) {
                     appendPopover("E2E", scmChangesHtml(build));
+                    append("<br/>");
                 }
-                build.firstUpstreamBuild
-                    .flatMap(upstreamBuild -> upstreamBuild.upstreamBuildReferences.stream().findFirst())
-                    .ifPresent(upstreamBuild -> writeBuildLink(upstreamBuild.upstreamUrl, upstreamBuild.number));
-                build.firstUpstreamBuild
-                    .flatMap(Build::getStartedByUser)
-                    .ifPresent(startedByUser -> appendPopover("User", startedByUser));
+                build.upstreamBuilds.stream()
+                    .flatMap(upstreamBuild -> upstreamBuild.upstreamBuildReferences.stream())
+                    .forEach(upstreamBuild -> writeBuildLink(upstreamBuild.upstreamUrl, upstreamBuild.number));
+                build.upstreamBuilds.stream()
+                    .map(Build::getStartedByUser)
+                    .flatMap(optionalToStream())
+                    .forEach(startedByUser -> appendPopover("User", startedByUser));
 
                 appendLine("</th>");
             } catch (Exception e) {
@@ -590,6 +597,7 @@ public class Main {
             append("<a href=\"").append(host).append(jobUrl).append(buildNumber).append("/\">");
             append(buildNumber);
             append("</a>");
+            appendLine("<br/>");
         }
 
         private String scmChangesHtml(Build build) {
@@ -673,5 +681,12 @@ public class Main {
             response.append(number);
             return this;
         }
+    }
+
+    private static <T> Function<Optional<T>, Stream<T>> optionalToStream() {
+        return (optional) -> {
+            if (!optional.isPresent()) return Stream.empty();
+            return Stream.of(optional.get());
+        };
     }
 }
