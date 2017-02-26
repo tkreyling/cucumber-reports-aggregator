@@ -247,11 +247,12 @@ public class Main {
 
         public void process() {
             queryJenkinsJobPage()
-                .flatMap(builds ->
+                .flatMap(buildReferences ->
                     ParallelBatch.of(
-                        builds.stream()
-                            .map(build ->
-                                queryCucumberReport(build).left(queryJenkinsBuildInformationIncludingUpstreamBuild(build)))
+                        buildReferences.stream()
+                            .map(buildReference ->
+                                queryCucumberReport(buildReference.number)
+                                    .left(queryJenkinsBuildInformationIncludingUpstreamBuild(buildReference.number)))
                             .collect(toList())
                     )
                         .yield()
@@ -266,7 +267,7 @@ public class Main {
                 .collect(toList());
         }
 
-        private Promise<List<String>> queryJenkinsJobPage() {
+        private Promise<List<BuildReference>> queryJenkinsJobPage() {
             return httpClient.get(URI.create(host + jenkinsJob + JENKINS_API_SUFFIX))
                 .map(this::getTextFromResponseBody)
                 .map(this::parseBuildNumbersFromJob);
@@ -303,19 +304,20 @@ public class Main {
             return receivedResponse.getBody().getText();
         }
 
-        private List<String> parseBuildNumbersFromJob(String text) {
+        private List<BuildReference> parseBuildNumbersFromJob(String text) {
             Document document = readDocument(text);
             XPathFactory xPathFactory = XPathFactory.instance();
 
-            XPathExpression<Element> buildXPath = xPathFactory.compile("//build/number", Filters.element());
+            XPathExpression<Element> buildNumberXPath = xPathFactory.compile("//build/number", Filters.element());
 
             String lastSuccessfulBuild = getSingleValue("//lastSuccessfulBuild/number", xPathFactory, document).get();
             String firstBuild = getSingleValue("//firstBuild/number", xPathFactory, document).get();
 
-            return buildXPath.evaluate(document).stream()
+            return buildNumberXPath.evaluate(document).stream()
                 .map(Element::getText)
-                .filter(build -> !build.equals(firstBuild))
-                .filter(build -> !build.equals(lastSuccessfulBuild))
+                .filter(number -> !number.equals(firstBuild))
+                .filter(number -> !number.equals(lastSuccessfulBuild))
+                .map(number -> new BuildReference(number, jenkinsJob))
                 .collect(toList());
         }
 
