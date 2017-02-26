@@ -7,6 +7,8 @@ import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.left;
+import static org.apache.commons.lang3.StringUtils.removeEnd;
+import static org.apache.commons.lang3.StringUtils.removeStart;
 
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
@@ -170,6 +172,11 @@ public class Main {
     static class BuildReference {
         public String number;
         public String jobPath;
+
+        public String getPlainJobName() {
+            String result = removeStart(jobPath, "job/");
+            return removeEnd(result, "/");
+        }
     }
 
     @Value
@@ -651,8 +658,8 @@ public class Main {
 
         private String scmCommitLink(ScmChange scmChange, Build build) {
             return scmRepositoryBaseUrl
-                .map(url -> "<td><a href='" + url + StringUtils.removeStart(build.buildReference.jobPath, "job/") +
-                    "commits/" + scmChange.commitId + "'>SCM</a></td>")
+                .map(url -> "<td><a href='" + url + build.buildReference.getPlainJobName() +
+                    "/commits/" + scmChange.commitId + "'>SCM</a></td>")
                 .orElse("");
         }
 
@@ -661,7 +668,7 @@ public class Main {
                 build.upstreamBuilds.stream()
                     .flatMap(upstreamBuild -> upstreamBuild.upstreamBuilds.stream())
                     .map(upstreamBuild -> "<tr>" +
-                        "<td><p class=&quot;text-left&quot;>" + upstreamBuild.buildReference.jobPath + "</p></td>" +
+                        "<td><p class=&quot;text-left&quot;>" + upstreamBuild.buildReference.getPlainJobName() + "</p></td>" +
                         "<td>" + buildLink(upstreamBuild.buildReference) + "</td>" +
                         "<td>" + scmChangesHtml(upstreamBuild) + "</td>" +
                         "</tr>")
