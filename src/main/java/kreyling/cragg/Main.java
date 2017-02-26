@@ -641,17 +641,12 @@ public class Main {
         private String upstreamBuildsHtml(Build build) {
             return "<table class='table table-condensed'>" +
                 build.upstreamBuilds.stream()
-                    .flatMap(upstreamBuild -> upstreamBuild.upstreamBuildReferences.stream())
-                    .collect(groupingBy(BuildReference::getJobPath))
-                    .entrySet().stream()
-                    .map(entry -> {
-                        String project = entry.getKey();
-                        String links = entry.getValue().stream().map(this::buildLink).collect(joining("<br/>\n"));
-                        return "<tr>" +
-                            "<td><p class=&quot;text-left&quot;>" + project + "</p></td>" +
-                            "<td>" + links + "</td>" +
-                            "</tr>";
-                    })
+                    .flatMap(upstreamBuild -> upstreamBuild.upstreamBuilds.stream())
+                    .map(upstreamBuild -> "<tr>" +
+                        "<td><p class=&quot;text-left&quot;>" + upstreamBuild.buildReference.jobPath + "</p></td>" +
+                        "<td>" + buildLink(upstreamBuild.buildReference) + "</td>" +
+                        "<td>" + scmChangesHtml(upstreamBuild) + "</td>" +
+                        "</tr>")
                     .collect(joining("\n")) +
                 "</table>";
         }
