@@ -10,6 +10,7 @@ import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.experimental.NonFinal;
+import lombok.experimental.Wither;
 import ratpack.exec.Promise;
 import ratpack.exec.util.ParallelBatch;
 import ratpack.func.Pair;
@@ -124,6 +125,7 @@ public class Main {
         public DateTime startedAt;
         public Optional<String> startedByUser;
         public List<BuildReference> upstreamBuildReferences;
+        @Wither public Optional<Build> firstUpstreamBuild;
         public List<ScmChange> scmChanges;
 
         public String getDurationFormatted() {
@@ -159,12 +161,6 @@ public class Main {
     static class ScmChange {
         public String user;
         public String comment;
-    }
-
-    @Value
-    static class BuildAndUpstreamBuild {
-        public Build build;
-        public Optional<Build> upstreamBuild;
     }
 
     @Value
@@ -274,14 +270,14 @@ public class Main {
                 .map(this::parseBuildNumbersFromJob);
         }
 
-        private Promise<BuildAndUpstreamBuild> queryJenkinsBuildInformationIncludingUpstreamBuild(String build) {
+        private Promise<Build> queryJenkinsBuildInformationIncludingUpstreamBuild(String build) {
             return queryJenkinsBuildInformation(jenkinsJob, build)
                 .flatMap(buildInfo -> buildInfo.upstreamBuildReferences.stream().findFirst()
                     .map(buildReference -> queryJenkinsBuildInformation(buildReference.upstreamUrl, buildReference.number)
                         .map(Optional::of)
                     )
                     .orElse(Promise.value(Optional.empty()))
-                    .map(optionalUpstreamBuild -> new BuildAndUpstreamBuild(buildInfo, optionalUpstreamBuild))
+                    .map(buildInfo::withFirstUpstreamBuild)
                 );
         }
 
@@ -342,7 +338,7 @@ public class Main {
 
             List<ScmChange> scmChanges = parseScmChanges(xPathFactory, document);
 
-            return new Build(build, duration, startedAt, startedByUser, upstreamBuilds, scmChanges);
+            return new Build(build, duration, startedAt, startedByUser, upstreamBuilds, Optional.empty(), scmChanges);
         }
 
         private List<BuildReference> parseUpstreamBuilds(XPathFactory xPathFactory, Document document) {
@@ -447,7 +443,7 @@ public class Main {
             }
         }
 
-        private void renderTestReports(List<? extends Pair<BuildAndUpstreamBuild, TestReport>> pairs) {
+        private void renderTestReports(List<? extends Pair<Build, TestReport>> pairs) {
             context.getResponse().status(Status.OK).contentType(MediaType.TEXT_HTML);
 
             List<TestReport> testReports = pairs.stream().map(Pair::getRight).collect(toList());
@@ -484,7 +480,7 @@ public class Main {
         StringBuilder response = new StringBuilder();
 
         private String buildHtml(
-            List<? extends Pair<BuildAndUpstreamBuild, TestReport>> pairs,
+            List<? extends Pair<Build, TestReport>> pairs,
             List<AggregatedTestReportLine> aggregatedTestReportLines
         ) {
             appendLine("<!DOCTYPE html>");
@@ -555,12 +551,11 @@ public class Main {
             return response.toString();
         }
 
-        private void writeOneColumnHeader(Pair<BuildAndUpstreamBuild, TestReport> pair) {
+        private void writeOneColumnHeader(Pair<Build, TestReport> pair) {
             TestReport testReport = pair.getRight();
-            Build build = pair.getLeft().build;
+            Build build = pair.getLeft();
 
             try {
-                Optional<Build> optionalUpstreamBuild = pair.getLeft().upstreamBuild;
                 append("<th");
                 if (testReport.isSystemFailure()) {
                     append(" class=\"system-failure\"");
@@ -578,10 +573,10 @@ public class Main {
                 if (!build.scmChanges.isEmpty()) {
                     appendPopover("E2E", scmChangesHtml(build));
                 }
-                optionalUpstreamBuild
+                build.firstUpstreamBuild
                     .flatMap(upstreamBuild -> upstreamBuild.upstreamBuildReferences.stream().findFirst())
                     .ifPresent(upstreamBuild -> writeBuildLink(upstreamBuild.upstreamUrl, upstreamBuild.number));
-                optionalUpstreamBuild
+                build.firstUpstreamBuild
                     .flatMap(Build::getStartedByUser)
                     .ifPresent(startedByUser -> appendPopover("User", startedByUser));
 
