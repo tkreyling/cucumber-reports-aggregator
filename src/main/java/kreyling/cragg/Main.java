@@ -579,9 +579,12 @@ public class Main {
                     appendPopover("E2E", scmChangesHtml(build));
                     append("<br/>");
                 }
-                build.upstreamBuilds.stream()
+                if (build.upstreamBuilds.stream()
                     .flatMap(upstreamBuild -> upstreamBuild.upstreamBuildReferences.stream())
-                    .forEach(upstreamBuild -> writeBuildLink(upstreamBuild.upstreamUrl, upstreamBuild.number));
+                    .count() > 0) {
+                    appendPopover("Project", upstreamBuildsHtml(build));
+                    append("<br/>");
+                }
                 build.upstreamBuilds.stream()
                     .map(Build::getStartedByUser)
                     .flatMap(optionalToStream())
@@ -600,11 +603,35 @@ public class Main {
             appendLine("<br/>");
         }
 
+        private String buildLink(BuildReference ref) {
+            return "<a href='" + host + ref.upstreamUrl + ref.number + "/'>" + ref.number + "</a>";
+        }
+
         private String scmChangesHtml(Build build) {
             return "<table class='table table-condensed'>" +
                 build.scmChanges.stream()
-                    .map(scmChange -> "<tr><td class=&quot;text-left&quot;>" + scmChange.user + "</td>" +
-                        "<td><p class=&quot;text-left&quot;>" + formatTextAsQuotedHtml(scmChange.comment) + "</p></td></tr>")
+                    .map(scmChange -> "<tr>" +
+                        "<td>" + scmChange.user + "</td>" +
+                        "<td><p class=&quot;text-left&quot;>" + formatTextAsQuotedHtml(scmChange.comment) + "</p></td>" +
+                        "</tr>")
+                    .collect(joining("\n")) +
+                "</table>";
+        }
+
+        private String upstreamBuildsHtml(Build build) {
+            return "<table class='table table-condensed'>" +
+                build.upstreamBuilds.stream()
+                    .flatMap(upstreamBuild -> upstreamBuild.upstreamBuildReferences.stream())
+                    .collect(groupingBy(BuildReference::getUpstreamUrl))
+                    .entrySet().stream()
+                    .map(entry -> {
+                        String project = entry.getKey();
+                        String links = entry.getValue().stream().map(this::buildLink).collect(joining("<br/>\n"));
+                        return "<tr>" +
+                            "<td><p class=&quot;text-left&quot;>" + project + "</p></td>" +
+                            "<td>" + links + "</td>" +
+                            "</tr>";
+                    })
                     .collect(joining("\n")) +
                 "</table>";
         }
