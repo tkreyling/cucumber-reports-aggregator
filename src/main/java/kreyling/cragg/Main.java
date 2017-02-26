@@ -123,7 +123,7 @@ public class Main {
         public Duration duration;
         public DateTime startedAt;
         public Optional<String> startedByUser;
-        public List<BuildReference> upstreamBuilds;
+        public List<BuildReference> upstreamBuildReferences;
         public List<ScmChange> scmChanges;
 
         public String getDurationFormatted() {
@@ -276,7 +276,7 @@ public class Main {
 
         private Promise<BuildAndUpstreamBuild> queryJenkinsBuildInformationIncludingUpstreamBuild(String build) {
             return queryJenkinsBuildInformation(jenkinsJob, build)
-                .flatMap(buildInfo -> buildInfo.upstreamBuilds.stream().findFirst()
+                .flatMap(buildInfo -> buildInfo.upstreamBuildReferences.stream().findFirst()
                     .map(buildReference -> queryJenkinsBuildInformation(buildReference.upstreamUrl, buildReference.number)
                         .map(Optional::of)
                     )
@@ -579,7 +579,7 @@ public class Main {
                     appendPopover("E2E", scmChangesHtml(build));
                 }
                 optionalUpstreamBuild
-                    .flatMap(upstreamBuild -> upstreamBuild.upstreamBuilds.stream().findFirst())
+                    .flatMap(upstreamBuild -> upstreamBuild.upstreamBuildReferences.stream().findFirst())
                     .ifPresent(upstreamBuild -> writeBuildLink(upstreamBuild.upstreamUrl, upstreamBuild.number));
                 optionalUpstreamBuild
                     .flatMap(Build::getStartedByUser)
