@@ -55,12 +55,13 @@ public class Main {
     public static void main(String... args) throws Exception {
         String host = args[0];
         String jenkinsJob = args[1];
+        Optional<String> scmRepositoryBaseUrl = getScmRepositoryBaseUrl(args);
 
         RatpackServer.start(server -> server
             .serverConfig(c -> c.baseDir(BaseDir.find()).build())
             .handlers(chain -> chain
                     .files(files -> files.dir("static"))
-                    .get(context -> new JenkinsRequestProcessor(host, jenkinsJob, context, context.get(HttpClient.class))
+                    .get(context -> new JenkinsRequestProcessor(host, jenkinsJob, scmRepositoryBaseUrl, context, context.get(HttpClient.class))
                         .process()
 //                        .queryJenkinsBuildInformationIncludingUpstreamBuild("1494")
 //                        .map(build -> new BuildAndUpstreamBuild(build, Optional.empty()))
@@ -68,6 +69,11 @@ public class Main {
                         )
             )
         );
+    }
+
+    private static Optional<String> getScmRepositoryBaseUrl(String[] args) {
+        if (args.length <= 2) return empty();
+        return Optional.of(args[2]);
     }
 
     @Value
@@ -239,14 +245,17 @@ public class Main {
     static class JenkinsRequestProcessor {
         String host;
         String jenkinsJob;
+        Optional<String> scmRepositoryBaseUrl;
         Context context;
         AggregatedReportBuilder aggregatedReportBuilder;
         HttpClient httpClient;
 
-        public JenkinsRequestProcessor(String host, String jenkinsJob, Context context, HttpClient httpClient) {
+        public JenkinsRequestProcessor(String host, String jenkinsJob, Optional<String> scmRepositoryBaseUrl,
+            Context context, HttpClient httpClient) {
             this(
                 host,
                 jenkinsJob,
+                scmRepositoryBaseUrl,
                 context,
                 new AggregatedReportBuilder(host, jenkinsJob),
                 httpClient

@@ -15,7 +15,7 @@ import org.junit.Test;
 import java.util.Optional;
 
 public class ParseBuildInformationTest {
-    JenkinsRequestProcessor jenkinsRequestProcessor = new JenkinsRequestProcessor(null, null, null, null);
+    JenkinsRequestProcessor jenkinsRequestProcessor = new JenkinsRequestProcessor(null, null, Optional.empty(), null, null);
     BuildReference testBuildReference = new BuildReference("testrun", null);
 
     @Test
