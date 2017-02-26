@@ -70,6 +70,7 @@ public class ParseBuildInformationTest {
         assertThat(build.upstreamBuildReferences, is(emptyList()));
 
         assertThat(build.scmChanges.size(), is(2));
+        assertThat(build.scmChanges.get(0).commitId, is("ab79615d7dd66d5863fcfc4d9fa2645d3c602248"));
         assertThat(build.scmChanges.get(0).user, is("Mustermann, Max"));
         assertThat(build.scmChanges.get(0).comment, is(
             "ABCD-3656 Überschrift des Kommentars\n" +

@@ -168,6 +168,7 @@ public class Main {
 
     @Value
     static class ScmChange {
+        public String commitId;
         public String user;
         public String comment;
     }
@@ -382,6 +383,7 @@ public class Main {
 
             return scmChangesXPath.evaluate(document).stream()
                 .map(element -> new ScmChange(
+                    element.getChildText("commitId"),
                     removeExtSuffix(element.getChild("author").getChildText("fullName")),
                     element.getChildText("comment")
                 ))
