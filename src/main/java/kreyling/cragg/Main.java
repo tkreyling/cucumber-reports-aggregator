@@ -156,7 +156,7 @@ public class Main {
     @Value
     static class BuildReference {
         public String number;
-        public String upstreamUrl;
+        public String jobPath;
     }
 
     @Value
@@ -279,7 +279,7 @@ public class Main {
                     ParallelBatch.of(
                         buildInfo.upstreamBuildReferences.stream()
                             .map(buildReference ->
-                                queryJenkinsBuildInformation(buildReference.upstreamUrl, buildReference.number))
+                                queryJenkinsBuildInformation(buildReference.jobPath, buildReference.number))
                             .collect(toList())
                     )
                         .yield()
@@ -294,7 +294,7 @@ public class Main {
         }
 
         private Promise<TestReport> queryCucumberReport(BuildReference buildReference) {
-            return httpClient.get(URI.create(host + buildReference.upstreamUrl + buildReference.number + CUCUMBER_REPORTS_OVERVIEW_PAGE))
+            return httpClient.get(URI.create(host + buildReference.jobPath + buildReference.number + CUCUMBER_REPORTS_OVERVIEW_PAGE))
                 .map(this::getTextFromResponseBody)
                 .map(this::repairHtml)
                 .map(text -> parseTestReport(text, buildReference.number));
@@ -606,7 +606,7 @@ public class Main {
         }
 
         private String buildLink(BuildReference ref) {
-            return "<a href='" + host + ref.upstreamUrl + ref.number + "/'>" + ref.number + "</a>";
+            return "<a href='" + host + ref.jobPath + ref.number + "/'>" + ref.number + "</a>";
         }
 
         private String scmChangesHtml(Build build) {
@@ -624,7 +624,7 @@ public class Main {
             return "<table class='table table-condensed'>" +
                 build.upstreamBuilds.stream()
                     .flatMap(upstreamBuild -> upstreamBuild.upstreamBuildReferences.stream())
-                    .collect(groupingBy(BuildReference::getUpstreamUrl))
+                    .collect(groupingBy(BuildReference::getJobPath))
                     .entrySet().stream()
                     .map(entry -> {
                         String project = entry.getKey();

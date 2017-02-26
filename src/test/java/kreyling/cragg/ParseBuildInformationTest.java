@@ -37,7 +37,7 @@ public class ParseBuildInformationTest {
         assertThat(build.buildNumber, is("testrun"));
         assertThat(build.startedByUser, is(Optional.empty()));
         assertThat(build.upstreamBuildReferences.get(0).number, is("1518"));
-        assertThat(build.upstreamBuildReferences.get(0).upstreamUrl, is("job/some-other-project/"));
+        assertThat(build.upstreamBuildReferences.get(0).jobPath, is("job/some-other-project/"));
         assertThat(build.scmChanges.size(), is(0));
     }
 
@@ -51,9 +51,9 @@ public class ParseBuildInformationTest {
         assertThat(build.startedByUser, is(Optional.empty()));
         assertThat(build.upstreamBuildReferences.size(), is(2));
         assertThat(build.upstreamBuildReferences.get(0).number, is("13"));
-        assertThat(build.upstreamBuildReferences.get(0).upstreamUrl, is("job/other-project-1/"));
+        assertThat(build.upstreamBuildReferences.get(0).jobPath, is("job/other-project-1/"));
         assertThat(build.upstreamBuildReferences.get(1).number, is("985"));
-        assertThat(build.upstreamBuildReferences.get(1).upstreamUrl, is("job/other-project-2/"));
+        assertThat(build.upstreamBuildReferences.get(1).jobPath, is("job/other-project-2/"));
         assertThat(build.scmChanges.size(), is(0));
     }
 
