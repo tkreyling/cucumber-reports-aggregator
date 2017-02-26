@@ -122,7 +122,7 @@ public class Main {
 
     @Value
     static class Build {
-        public String buildNumber;
+        public BuildReference buildReference;
         public Duration duration;
         public DateTime startedAt;
         public Optional<String> startedByUser;
@@ -364,7 +364,7 @@ public class Main {
 
             List<ScmChange> scmChanges = parseScmChanges(xPathFactory, document);
 
-            return new Build(buildReference.number, duration, startedAt, startedByUser, upstreamBuilds, Collections.emptyList(), scmChanges);
+            return new Build(buildReference, duration, startedAt, startedByUser, upstreamBuilds, Collections.emptyList(), scmChanges);
         }
 
         private List<BuildReference> parseUpstreamBuilds(XPathFactory xPathFactory, Document document) {
@@ -613,7 +613,7 @@ public class Main {
 
                 appendLine("</th>");
             } catch (Exception e) {
-                throw new RuntimeException("Exception while writing header cell for build " + build.buildNumber, e);
+                throw new RuntimeException("Exception while writing header cell for build " + build.buildReference.number, e);
             }
         }
 

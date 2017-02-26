@@ -24,7 +24,7 @@ public class ParseBuildInformationTest {
 
         Build build = jenkinsRequestProcessor.parseBuildInfo(startedByUser, testBuildReference);
 
-        assertThat(build.buildNumber, is("testrun"));
+        assertThat(build.buildReference.number, is("testrun"));
         assertThat(build.startedByUser, is(Optional.of("Kreyling, Thomas")));
         assertThat(build.upstreamBuildReferences, is(emptyList()));
         assertThat(build.scmChanges.size(), is(0));
@@ -36,7 +36,7 @@ public class ParseBuildInformationTest {
 
         Build build = jenkinsRequestProcessor.parseBuildInfo(startedByUser, testBuildReference);
 
-        assertThat(build.buildNumber, is("testrun"));
+        assertThat(build.buildReference.number, is("testrun"));
         assertThat(build.startedByUser, is(Optional.empty()));
         assertThat(build.upstreamBuildReferences.get(0).number, is("1518"));
         assertThat(build.upstreamBuildReferences.get(0).jobPath, is("job/some-other-project/"));
@@ -49,7 +49,7 @@ public class ParseBuildInformationTest {
 
         Build build = jenkinsRequestProcessor.parseBuildInfo(startedByTwoDifferentJobs, testBuildReference);
 
-        assertThat(build.buildNumber, is("testrun"));
+        assertThat(build.buildReference.number, is("testrun"));
         assertThat(build.startedByUser, is(Optional.empty()));
         assertThat(build.upstreamBuildReferences.size(), is(2));
         assertThat(build.upstreamBuildReferences.get(0).number, is("13"));
@@ -65,7 +65,7 @@ public class ParseBuildInformationTest {
 
         Build build = jenkinsRequestProcessor.parseBuildInfo(startedByScmChange, testBuildReference);
 
-        assertThat(build.buildNumber, is("testrun"));
+        assertThat(build.buildReference.number, is("testrun"));
         assertThat(build.startedByUser, is(Optional.empty()));
         assertThat(build.upstreamBuildReferences, is(emptyList()));
 
