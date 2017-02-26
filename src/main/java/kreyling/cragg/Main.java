@@ -273,17 +273,34 @@ public class Main {
                 .map(this::parseBuildNumbersFromJob);
         }
 
-        private Promise<Build> queryJenkinsBuildInformationIncludingUpstreamBuild(BuildReference buildReference) {
-            return queryJenkinsBuildInformation(buildReference)
-                .flatMap(buildInfo ->
+        private Promise<Build> queryJenkinsBuildInformationIncludingUpstreamBuild(BuildReference buildReferenceLevel0) {
+            return queryJenkinsBuildInformation(buildReferenceLevel0)
+                .flatMap(buildInfoLevel0 ->
                     ParallelBatch.of(
-                        buildInfo.upstreamBuildReferences.stream()
-                            .map(this::queryJenkinsBuildInformation)
+                        buildInfoLevel0.upstreamBuildReferences.stream()
+                            .map(buildReferenceLevel1 -> queryJenkinsBuildInformation(buildReferenceLevel1)
+                                .flatMap(buildInfoLevel1 ->
+                                    ParallelBatch.of(
+                                        buildInfoLevel1.upstreamBuildReferences.stream()
+                                            .map(this::queryJenkinsBuildInformation)
+                                            .collect(toList())
+                                    )
+                                        .yield()
+                                        .map(this::filterNotFoundBuilds)
+                                        .map(buildInfoLevel1::withUpstreamBuilds)
+                                ))
                             .collect(toList())
                     )
                         .yield()
-                        .map(buildInfo::withUpstreamBuilds)
+                        .map(this::filterNotFoundBuilds)
+                        .map(buildInfoLevel0::withUpstreamBuilds)
                 );
+        }
+
+        private <T extends Build> List<T> filterNotFoundBuilds(List<T> builds) {
+            return builds.stream()
+                .filter(build -> build != null)
+                .collect(toList());
         }
 
         private Promise<Build> queryJenkinsBuildInformation(BuildReference buildReference) {
@@ -322,7 +339,10 @@ public class Main {
 
         private Build parseBuildInfo(String text, BuildReference buildReference) {
             try {
+                if (text.contains("Not Found")) return null;
+
                 return parseBuildInfo(readDocument(text), buildReference);
+
             } catch (RuntimeException e) {
                 throw new RuntimeException(buildReference + ": " + left(text, 200), e);
             }
