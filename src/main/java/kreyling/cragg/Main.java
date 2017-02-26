@@ -297,7 +297,7 @@ public class Main {
             return httpClient.get(URI.create(host + buildReference.jobPath + buildReference.number + CUCUMBER_REPORTS_OVERVIEW_PAGE))
                 .map(this::getTextFromResponseBody)
                 .map(this::repairHtml)
-                .map(text -> parseTestReport(text, buildReference.number));
+                .map(text -> parseTestReport(text, buildReference));
         }
 
         private String getTextFromResponseBody(ReceivedResponse receivedResponse) {
@@ -400,7 +400,7 @@ public class Main {
             }
         }
 
-        private TestReport parseTestReport(String text, String build) {
+        private TestReport parseTestReport(String text, BuildReference buildReference) {
             try {
                 Document document = readDocument(text);
                 XPathFactory xPathFactory = XPathFactory.instance();
@@ -425,7 +425,7 @@ public class Main {
                         .collect(toList())
                 );
             } catch (RuntimeException e) {
-                throw new RuntimeException(build + ": " + left(text, 200), e);
+                throw new RuntimeException(buildReference + ": " + left(text, 200), e);
             }
         }
 
