@@ -5,6 +5,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
 import kreyling.cragg.Main.Build;
+import kreyling.cragg.Main.BuildReference;
 import kreyling.cragg.Main.JenkinsRequestProcessor;
 
 import org.jdom2.Document;
@@ -15,12 +16,13 @@ import java.util.Optional;
 
 public class ParseBuildInformationTest {
     JenkinsRequestProcessor jenkinsRequestProcessor = new JenkinsRequestProcessor(null, null, null, null);
+    BuildReference testBuildReference = new BuildReference("testrun", null);
 
     @Test
     public void startedByUser() {
         Document startedByUser = readTestDocument("startedByUser.xml");
 
-        Build build = jenkinsRequestProcessor.parseBuildInfo(startedByUser, "testrun");
+        Build build = jenkinsRequestProcessor.parseBuildInfo(startedByUser, testBuildReference);
 
         assertThat(build.buildNumber, is("testrun"));
         assertThat(build.startedByUser, is(Optional.of("Kreyling, Thomas")));
@@ -32,7 +34,7 @@ public class ParseBuildInformationTest {
     public void startedByJob() {
         Document startedByUser = readTestDocument("startedByJob.xml");
 
-        Build build = jenkinsRequestProcessor.parseBuildInfo(startedByUser, "testrun");
+        Build build = jenkinsRequestProcessor.parseBuildInfo(startedByUser, testBuildReference);
 
         assertThat(build.buildNumber, is("testrun"));
         assertThat(build.startedByUser, is(Optional.empty()));
@@ -45,7 +47,7 @@ public class ParseBuildInformationTest {
     public void startedByTwoDifferentJobs() {
         Document startedByTwoDifferentJobs = readTestDocument("startedByTwoDifferentJobs.xml");
 
-        Build build = jenkinsRequestProcessor.parseBuildInfo(startedByTwoDifferentJobs, "testrun");
+        Build build = jenkinsRequestProcessor.parseBuildInfo(startedByTwoDifferentJobs, testBuildReference);
 
         assertThat(build.buildNumber, is("testrun"));
         assertThat(build.startedByUser, is(Optional.empty()));
@@ -61,7 +63,7 @@ public class ParseBuildInformationTest {
     public void startedByScmChange() {
         Document startedByScmChange = readTestDocument("startedByScmChange.xml");
 
-        Build build = jenkinsRequestProcessor.parseBuildInfo(startedByScmChange, "testrun");
+        Build build = jenkinsRequestProcessor.parseBuildInfo(startedByScmChange, testBuildReference);
 
         assertThat(build.buildNumber, is("testrun"));
         assertThat(build.startedByUser, is(Optional.empty()));

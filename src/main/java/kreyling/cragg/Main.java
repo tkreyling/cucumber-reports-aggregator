@@ -252,7 +252,7 @@ public class Main {
                         buildReferences.stream()
                             .map(buildReference ->
                                 queryCucumberReport(buildReference)
-                                    .left(queryJenkinsBuildInformationIncludingUpstreamBuild(buildReference.number)))
+                                    .left(queryJenkinsBuildInformationIncludingUpstreamBuild(buildReference)))
                             .collect(toList())
                     )
                         .yield()
@@ -273,13 +273,12 @@ public class Main {
                 .map(this::parseBuildNumbersFromJob);
         }
 
-        private Promise<Build> queryJenkinsBuildInformationIncludingUpstreamBuild(String build) {
-            return queryJenkinsBuildInformation(jenkinsJob, build)
+        private Promise<Build> queryJenkinsBuildInformationIncludingUpstreamBuild(BuildReference buildReference) {
+            return queryJenkinsBuildInformation(buildReference)
                 .flatMap(buildInfo ->
                     ParallelBatch.of(
                         buildInfo.upstreamBuildReferences.stream()
-                            .map(buildReference ->
-                                queryJenkinsBuildInformation(buildReference.jobPath, buildReference.number))
+                            .map(this::queryJenkinsBuildInformation)
                             .collect(toList())
                     )
                         .yield()
@@ -287,10 +286,10 @@ public class Main {
                 );
         }
 
-        private Promise<Build> queryJenkinsBuildInformation(String jenkinsJob, String build) {
-            return httpClient.get(URI.create(host + jenkinsJob + build + JENKINS_API_SUFFIX))
+        private Promise<Build> queryJenkinsBuildInformation(BuildReference buildReference) {
+            return httpClient.get(URI.create(host + buildReference.jobPath + buildReference.number + JENKINS_API_SUFFIX))
                 .map(this::getTextFromResponseBody)
-                .map(text -> parseBuildInfo(text, build));
+                .map(text -> parseBuildInfo(text, buildReference));
         }
 
         private Promise<TestReport> queryCucumberReport(BuildReference buildReference) {
@@ -321,15 +320,15 @@ public class Main {
                 .collect(toList());
         }
 
-        private Build parseBuildInfo(String text, String build) {
+        private Build parseBuildInfo(String text, BuildReference buildReference) {
             try {
-                return parseBuildInfo(readDocument(text), build);
+                return parseBuildInfo(readDocument(text), buildReference);
             } catch (RuntimeException e) {
-                throw new RuntimeException(build + ": " + left(text, 200), e);
+                throw new RuntimeException(buildReference + ": " + left(text, 200), e);
             }
         }
 
-        Build parseBuildInfo(Document document, String build) {
+        Build parseBuildInfo(Document document, BuildReference buildReference) {
             XPathFactory xPathFactory = XPathFactory.instance();
 
             Duration duration = getSingleValue("//duration", xPathFactory, document)
@@ -345,7 +344,7 @@ public class Main {
 
             List<ScmChange> scmChanges = parseScmChanges(xPathFactory, document);
 
-            return new Build(build, duration, startedAt, startedByUser, upstreamBuilds, Collections.emptyList(), scmChanges);
+            return new Build(buildReference.number, duration, startedAt, startedByUser, upstreamBuilds, Collections.emptyList(), scmChanges);
         }
 
         private List<BuildReference> parseUpstreamBuilds(XPathFactory xPathFactory, Document document) {
