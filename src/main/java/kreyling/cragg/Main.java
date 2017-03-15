@@ -38,6 +38,8 @@ import org.joda.time.Duration;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.PeriodFormatter;
 import org.joda.time.format.PeriodFormatterBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.StringReader;
 import java.net.URI;
@@ -48,6 +50,7 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 public class Main {
+    private static Logger logger = LoggerFactory.getLogger(Main.class);
 
     public static final String JENKINS_API_SUFFIX = "/api/xml";
 
@@ -58,6 +61,8 @@ public class Main {
         String host = args[0];
         String jenkinsJob = args[1];
         Optional<String> scmRepositoryBaseUrl = getScmRepositoryBaseUrl(args);
+
+        logger.info("Starting ...");
 
         RatpackServer.start(server -> server
             .serverConfig(c -> c.baseDir(BaseDir.find()).build())
@@ -290,7 +295,7 @@ public class Main {
         }
 
         private Promise<List<BuildReference>> queryJenkinsJobPage() {
-            return httpClient.get(URI.create(host + jenkinsJob + JENKINS_API_SUFFIX))
+            return httpGet(host + jenkinsJob + JENKINS_API_SUFFIX)
                 .map(this::getTextFromResponseBody)
                 .map(this::parseBuildNumbersFromJob);
         }
@@ -318,16 +323,27 @@ public class Main {
         }
 
         private Promise<Build> queryJenkinsBuildInformation(BuildReference buildReference) {
-            return httpClient.get(URI.create(host + buildReference.jobPath + buildReference.number + JENKINS_API_SUFFIX))
+            return httpGet(host + buildReference.jobPath + buildReference.number + JENKINS_API_SUFFIX)
                 .map(this::getTextFromResponseBody)
                 .map(text -> parseBuildInfo(text, buildReference));
         }
 
         private Promise<TestReport> queryCucumberReport(BuildReference buildReference) {
-            return httpClient.get(URI.create(host + buildReference.jobPath + buildReference.number + CUCUMBER_REPORTS_OVERVIEW_PAGE))
+            return httpGet(host + buildReference.jobPath + buildReference.number + CUCUMBER_REPORTS_OVERVIEW_PAGE)
                 .map(this::getTextFromResponseBody)
                 .map(this::repairHtml)
                 .map(text -> parseTestReport(text, buildReference));
+        }
+
+        private Promise<ReceivedResponse> httpGet(String url) {
+            return httpClient.get(URI.create(url))
+                .map(result -> {
+                    logger.info(String.format("Successful GET for %s", url));
+                    return result;
+                })
+                .onError(throwable ->
+                    logger.error(String.format("Error on GET for %s", url), throwable)
+                );
         }
 
         private String getTextFromResponseBody(ReceivedResponse receivedResponse) {

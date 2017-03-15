@@ -19,6 +19,7 @@ dependencies {
     compile "jaxen:jaxen:1.1.6"
     compile "org.apache.commons:commons-lang3:3.5"
     compile "joda-time:joda-time:2.9.7"
+    compile "ch.qos.logback:logback-classic:1.0.13"
 
     compileOnly "org.projectlombok:lombok:1.16.12"
 
