@@ -6,6 +6,7 @@ import static java.util.Optional.empty;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.left;
 import static org.apache.commons.lang3.StringUtils.removeEnd;
 import static org.apache.commons.lang3.StringUtils.removeStart;
@@ -452,11 +453,12 @@ public class Main {
 
         private TestReport parseTestReport(String text, BuildReference buildReference) {
             try {
-                Document document = readDocument(text);
-                XPathFactory xPathFactory = XPathFactory.instance();
-
+                if (isBlank(text)) return null;
                 if (text.contains("Not found")) return null;
                 if (text.contains("You have no features in your cucumber report")) return null;
+
+                Document document = readDocument(text);
+                XPathFactory xPathFactory = XPathFactory.instance();
 
                 XPathExpression<Element> titleXPath = xPathFactory.compile(
                     "//title", Filters.element());
