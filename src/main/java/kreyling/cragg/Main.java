@@ -194,7 +194,7 @@ public class Main {
 
     @Value
     static class TestReport {
-        String buildNumber;
+        public String buildNumber;
         List<TestReportLine> testReportLines;
         Map<Feature, List<TestReportLine>> testReportLinesByFeature;
 
@@ -289,7 +289,7 @@ public class Main {
                 .then(this::renderTestReports);
         }
 
-        private <T> List<? extends Pair<T, TestReport>> filterEmptyReports(List<? extends Pair<T, TestReport>> pairs) {
+        private <L, P extends Pair<L, TestReport>> List<P> filterEmptyReports(List<P> pairs) {
             return pairs.stream()
                 .filter(pair -> pair.getRight() != null)
                 .collect(toList());
@@ -518,7 +518,7 @@ public class Main {
         }
 
         private AggregatedTestReportLine createAggregatedTestReportLine(
-            List<? extends TestReport> testReports,
+            List<TestReport> testReports,
             Feature feature
         ) {
             List<Pair<TestReportLine, TestReport>> allTestReportLinesForThisFeature = testReports.stream()
