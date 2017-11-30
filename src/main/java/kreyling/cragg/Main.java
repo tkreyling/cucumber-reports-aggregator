@@ -56,7 +56,7 @@ public class Main {
     public static final String JENKINS_API_SUFFIX = "/api/xml";
 
     public static final String CUCUMBER_REPORTS_PATH = "/cucumber-html-reports/";
-    public static final String CUCUMBER_REPORTS_OVERVIEW_PAGE = CUCUMBER_REPORTS_PATH + "feature-overview.html";
+    public static final String CUCUMBER_REPORTS_OVERVIEW_PAGE = CUCUMBER_REPORTS_PATH + "overview-features.html";
 
     public static void main(String... args) throws Exception {
         String host = args[0];
@@ -434,6 +434,13 @@ public class Main {
 
         private String repairHtml(String text) {
             return Stream.of(text.split("\n"))
+                .map(line -> StringUtils.replaceAll(line, "&ouml;", "ö"))
+                .map(line -> StringUtils.replaceAll(line, "&auml;", "ä"))
+                .map(line -> StringUtils.replaceAll(line, "&uuml;", "ü"))
+                .map(line -> StringUtils.replaceAll(line, "&Ouml;", "Ö"))
+                .map(line -> StringUtils.replaceAll(line, "&Auml;", "Ä"))
+                .map(line -> StringUtils.replaceAll(line, "&Uuml;", "Ü"))
+                .map(line -> StringUtils.replaceAll(line, "&nbsp;", " "))
                 .map(this::replaceBrokenLine)
                 .collect(joining("\n"));
 
@@ -456,6 +463,7 @@ public class Main {
                 if (isBlank(text)) return null;
                 if (text.contains("Not found")) return null;
                 if (text.contains("You have no features in your cucumber report")) return null;
+                if (text.contains("Something went wrong")) return null;
 
                 Document document = readDocument(text);
                 XPathFactory xPathFactory = XPathFactory.instance();
